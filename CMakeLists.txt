@@ -23,7 +23,7 @@ else()
 endif()
 
 # Add the executable
-file(GLOB SOURCES ${CMAKE_SOURCE_DIR}/src/*.cpp)
+file(GLOB_RECURSE SOURCES ${CMAKE_SOURCE_DIR}/src/*.cpp)
 add_executable(VoxelEngine ${SOURCES})
 
 # Link libraries
