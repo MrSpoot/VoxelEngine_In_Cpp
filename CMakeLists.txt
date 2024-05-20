@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR}/include/imgui)
 
 # Add GLAD source
 add_library(glad ${CMAKE_SOURCE_DIR}/src/glad.c)
@@ -24,7 +25,7 @@ endif()
 
 # Add the executable
 file(GLOB_RECURSE SOURCES ${CMAKE_SOURCE_DIR}/src/*.cpp)
-add_executable(VoxelEngine ${SOURCES})
+add_executable(VoxelEngine ${SOURCES} ${LIB_SOURCES})
 
 # Link libraries
 target_link_libraries(VoxelEngine glad ${GLFW_LIB} ${CMAKE_DL_LIBS})

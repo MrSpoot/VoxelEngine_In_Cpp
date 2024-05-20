@@ -4,15 +4,24 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+
 #include <iostream>
+#include <vector>
+#include <numeric>
+#include <algorithm>
 #include "VoxelEngine/utils/Shader.h"
-#include "VoxelEngine/utils/stb_image.cpp"
+#include "VoxelEngine/utils/stb_image.h"
 #include "VoxelEngine/utils/Camera.h"
+#include "VoxelEngine/utils/Texture.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+float calculateFPS(std::vector<float>& fpsValues, float& averageFPS, float& maxFps);
 
 // settings
 const unsigned int SCR_WIDTH = 1280;
@@ -44,7 +53,7 @@ int main()
 
     // glfw window creation
     // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "VoxelEngine", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -55,10 +64,9 @@ int main()
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
+    glfwSwapInterval( 0 );
 
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    // glad: load all OpenGL function pointers
+    // Glad: load all OpenGL function pointers
     // ---------------------------------------
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -143,7 +151,7 @@ int main()
     // VAOs requires a call to glBindVertexArray anyways so we generally don't unbind VAOs (nor VBOs) when it's not directly necessary.
     glBindVertexArray(0);
 
-    unsigned int texture;
+    /*unsigned int texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
 // définit les options de la texture actuellement liée
@@ -163,7 +171,12 @@ int main()
     {
         std::cout << "Failed to load texture" << std::endl;
     }
-    stbi_image_free(data);
+    stbi_image_free(data);*/
+
+    Texture texture(glm::vec4(0.36,0.76,0.4,1.0),8,8);
+
+    texture.bind();
+
 
     // uncomment this call to draw in wireframe polygons.
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -171,6 +184,13 @@ int main()
     float i = 0;
 
     glEnable(GL_DEPTH_TEST);
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window,true);
+    ImGui_ImplOpenGL3_Init("#version 330");
 
     glm::vec3 cubePositions[] = {
             glm::vec3( 0.0f,  0.0f,  0.0f),
@@ -185,6 +205,10 @@ int main()
             glm::vec3(-1.3f,  1.0f, -1.5f)
     };
 
+    std::vector<float> fpsValues;
+    float averageFPS = 0.0f;
+    float maxFps = 0.0f;
+
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -195,6 +219,8 @@ int main()
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
+
+        float fps = calculateFPS(fpsValues, averageFPS, maxFps);
 
         // input
         // -----
@@ -228,6 +254,35 @@ int main()
         }
         glBindVertexArray(0);
 
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::SetNextWindowSize(ImVec2(325,125));
+        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.3);
+        // Begin window with no title bar, no resize, no move, no scrollbar, no collapse, no nav, no background
+        ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                                        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav ;
+
+        ImGui::PushStyleColor(ImGuiCol_PlotLines, ImVec4(0.8f, 0.1f, 0.1f, 1.0f)); // Green line
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, 0.3f));
+
+        ImGui::Begin("Performance", nullptr, window_flags);
+        if (fps > 0.0f) {
+            ImGui::Text("FPS: %.1f", fps);
+        }
+        ImGui::PlotLines("FPS Over Time", fpsValues.data(), fpsValues.size(), 0, nullptr, 0.0f, maxFps + maxFps * 0.1, ImVec2(0, 80));
+
+        ImGui::PopStyleColor(2);
+
+        ImGui::Text("Average FPS: %.1f", averageFPS);
+        ImGui::Text("Max FPS: %.1f", maxFps);
+        ImGui::End();
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
@@ -235,6 +290,10 @@ int main()
 
         i++;
     }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
@@ -257,6 +316,13 @@ void processInput(GLFWwindow *window)
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
+
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    if (glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS)
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -296,4 +362,30 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
+}
+
+float calculateFPS(std::vector<float>& fpsValues, float& averageFPS, float& maxFps) {
+    static float lastTime = glfwGetTime();
+    static int frameCount = 0;
+
+    float currentTime = glfwGetTime();
+    frameCount++;
+    float deltaTime = currentTime - lastTime;
+
+    if (deltaTime >= 1.0) {
+        float fps = frameCount / deltaTime;
+        fpsValues.push_back(fps);
+        if (fpsValues.size() > 50) {
+            fpsValues.erase(fpsValues.begin());
+        }
+
+        averageFPS = std::accumulate(fpsValues.begin(), fpsValues.end(), 0.0f) / fpsValues.size();
+
+        maxFps = *std::max_element(fpsValues.begin(),fpsValues.end());
+
+        lastTime = currentTime;
+        frameCount = 0;
+        return fps;
+    }
+    return -1.0f;
 }
