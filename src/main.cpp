@@ -12,10 +12,11 @@
 #include <vector>
 #include <numeric>
 #include <algorithm>
-#include "VoxelEngine/utils/Shader.h"
+#include "VoxelEngine/utils/shader.h"
 #include "VoxelEngine/utils/stb_image.h"
-#include "VoxelEngine/utils/Camera.h"
-#include "VoxelEngine/utils/Texture.h"
+#include "VoxelEngine/utils/camera.h"
+#include "VoxelEngine/utils/texture.h"
+#include "VoxelEngine/components/cube.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -28,10 +29,14 @@ const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
+bool cameraLock = true;
+
+bool showSecondWindow = false;
+bool wireframeMode = false;
 
 // timing
 float deltaTime = 0.0f;	// time between current frame and last frame
@@ -74,116 +79,21 @@ int main()
         return -1;
     }
 
-    Shader shader("C:\\Users\\Betterfly\\Documents\\GitHub\\VoxelEngine_In_Cpp\\resources\\shaders\\vertex.glsl","C:\\Users\\Betterfly\\Documents\\GitHub\\VoxelEngine_In_Cpp\\resources\\shaders\\fragment.glsl");
+    shader shader("C:\\Users\\Betterfly\\Documents\\GitHub\\VoxelEngine_In_Cpp\\resources\\shaders\\vertex.glsl", "C:\\Users\\Betterfly\\Documents\\GitHub\\VoxelEngine_In_Cpp\\resources\\shaders\\fragment.glsl");
 
-    // set up vertex data (and buffer(s)) and configure vertex attributes
-    // ------------------------------------------------------------------
-    float vertices[] = {
-            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-            0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-            -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-
-            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
-    };
-    unsigned int indices[] = {  // Notons que l’on commence à 0!
-            0, 1, 3,   // premier triangle
-            1, 2, 3    // second triangle
-    };
-
-    unsigned int VBO, VAO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-    // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    // You can unbind the VAO afterwards so other VAO calls won't accidentally modify this VAO, but this rarely happens. Modifying other
-    // VAOs requires a call to glBindVertexArray anyways so we generally don't unbind VAOs (nor VBOs) when it's not directly necessary.
-    glBindVertexArray(0);
-
-    /*unsigned int texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-// définit les options de la texture actuellement liée
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-// charge et génère la texture
-    int width, height, nrChannels;
-    unsigned char *data = stbi_load("C:\\Users\\Betterfly\\Documents\\GitHub\\VoxelEngine_In_Cpp\\resources\\container.jpg", &width, &height, &nrChannels, 0);
-    if (data)
-    {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-    else
-    {
-        std::cout << "Failed to load texture" << std::endl;
-    }
-    stbi_image_free(data);*/
-
-    Texture texture(glm::vec4(0.36,0.76,0.4,1.0),8,8);
-
+    texture texture(glm::vec4(0.36, 0.76, 0.4, 1.0), 8, 8);
     texture.bind();
-
 
     // uncomment this call to draw in wireframe polygons.
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+    Cube cube(1.0f,texture.textureID);
+
     float i = 0;
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -192,34 +102,17 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window,true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
-    glm::vec3 cubePositions[] = {
-            glm::vec3( 0.0f,  0.0f,  0.0f),
-            glm::vec3( 2.0f,  5.0f, -15.0f),
-            glm::vec3(-1.5f, -2.2f, -2.5f),
-            glm::vec3(-3.8f, -2.0f, -12.3f),
-            glm::vec3( 2.4f, -0.4f, -3.5f),
-            glm::vec3(-1.7f,  3.0f, -7.5f),
-            glm::vec3( 1.3f, -2.0f, -2.5f),
-            glm::vec3( 1.5f,  2.0f, -2.5f),
-            glm::vec3( 1.5f,  0.2f, -1.5f),
-            glm::vec3(-1.3f,  1.0f, -1.5f)
-    };
-
     std::vector<float> fpsValues;
     float averageFPS = 0.0f;
     float maxFps = 0.0f;
+
+    int simulationWidth = 10;
+    int simulationDepth = 10;
 
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
     {
-
-        // per-frame time logic
-        // --------------------
-        float currentFrame = static_cast<float>(glfwGetTime());
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
-
         float fps = calculateFPS(fpsValues, averageFPS, maxFps);
 
         // input
@@ -234,24 +127,28 @@ int main()
         // draw our first triangle
         shader.use();
 
-        glm::mat4 proj = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::vec3 lightpos = glm::vec3(0.0,15.0,0.0);
+
+        shader.setVec3("lightPos",lightpos);
+
+        glm::mat4 proj = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
         shader.setMat4("projection", proj);
 
         glm::mat4 view = camera.GetViewMatrix();
         shader.setMat4("view", view);
 
-        glBindVertexArray(VAO);
-        for (unsigned int i = 0; i < 10; i++)
+        for (unsigned int x = 0; x < simulationWidth; x++)
         {
-            // calculate the model matrix for each object and pass it to shader before drawing
-            glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-            model = glm::translate(model, cubePositions[i]);
-            float angle = 20.0f * i;
-            model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-            shader.setMat4("model", model);
+            for (unsigned int z = 0; z < simulationDepth; z++)
+            {
 
-            glDrawArrays(GL_TRIANGLES, 0, 36);
+                glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+                model = glm::translate(model, glm::vec3(x*2,-3,z*2));
+                shader.setMat4("model", model);
+                cube.draw();
+            }
         }
+
         glBindVertexArray(0);
 
         ImGui_ImplOpenGL3_NewFrame();
@@ -269,9 +166,7 @@ int main()
         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, 0.3f));
 
         ImGui::Begin("Performance", nullptr, window_flags);
-        if (fps > 0.0f) {
-            ImGui::Text("FPS: %.1f", fps);
-        }
+        ImGui::Text("FPS: %.1f", fps);
         ImGui::PlotLines("FPS Over Time", fpsValues.data(), fpsValues.size(), 0, nullptr, 0.0f, maxFps + maxFps * 0.1, ImVec2(0, 80));
 
         ImGui::PopStyleColor(2);
@@ -279,6 +174,23 @@ int main()
         ImGui::Text("Average FPS: %.1f", averageFPS);
         ImGui::Text("Max FPS: %.1f", maxFps);
         ImGui::End();
+
+        if (showSecondWindow) {
+            ImGui::Begin("Options");
+            ImGui::Checkbox("Wireframe Mode", &wireframeMode);
+            ImGui::InputInt("Size X", &simulationWidth);
+            ImGui::InputInt("Size Y", &simulationDepth);
+            ImGui::Text("Cube number: %i",simulationDepth * simulationWidth);
+            ImGui::Text("Triangle render: %i",simulationDepth * simulationWidth * 12);
+            ImGui::End();
+        }
+
+        // Set wireframe mode
+        if (wireframeMode) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        } else {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -315,12 +227,20 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        std::cout << "ALLO\n";
         camera.ProcessKeyboard(RIGHT, deltaTime);
 
-    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
+        cameraLock = false;
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    if (glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS)
+    }
+    if (glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS){
+        cameraLock = true;
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS)
+        showSecondWindow = !showSecondWindow;
 
 
 }
@@ -354,7 +274,9 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
     lastX = xpos;
     lastY = ypos;
 
-    camera.ProcessMouseMovement(xoffset, yoffset);
+    if(!cameraLock){
+        camera.ProcessMouseMovement(xoffset, yoffset);
+    }
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
@@ -385,7 +307,13 @@ float calculateFPS(std::vector<float>& fpsValues, float& averageFPS, float& maxF
 
         lastTime = currentTime;
         frameCount = 0;
-        return fps;
+
     }
-    return -1.0f;
+    if(fpsValues.size() > 0){
+        return fpsValues[fpsValues.size()-1];
+    }else{
+        return 0.0f;
+    }
+
+
 }

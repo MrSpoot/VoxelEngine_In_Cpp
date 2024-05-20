@@ -1,33 +1,33 @@
-#include "VoxelEngine/utils/Texture.h"
+#include "VoxelEngine/utils/texture.h"
 #include <iostream>
 
 // Constructor
-Texture::Texture() {
-    Texture::generateTexture();
+texture::texture() {
+    texture::generateTexture();
     generateUnicolorTexture(glm::vec4(1.0) ,16,16);
 }
 
-Texture::Texture(const glm::vec4 &color, int width, int height) {
-    Texture::generateTexture();
+texture::texture(const glm::vec4 &color, int width, int height) {
+    texture::generateTexture();
     generateUnicolorTexture(color,width,height);
 }
 
-Texture::Texture(const std::string &path) {
-    Texture::generateTexture();
+texture::texture(const std::string &path) {
+    texture::generateTexture();
     loadImage(path,false);
 }
 
-Texture::Texture(const std::string &path, bool flip) {
-    Texture::generateTexture();
+texture::texture(const std::string &path, bool flip) {
+    texture::generateTexture();
     loadImage(path,flip);
 }
 
 // Destructor
-Texture::~Texture() {
+texture::~texture() {
     glDeleteTextures(1, &textureID);
 }
 
-void Texture::generateTexture(){
+void texture::generateTexture(){
     glGenTextures(1, &textureID);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -38,7 +38,7 @@ void Texture::generateTexture(){
     bind();
 }
 
-void Texture::loadImage(const std::string &path, bool flip){
+void texture::loadImage(const std::string &path, bool flip){
     int width,height,nrChannels;
     stbi_set_flip_vertically_on_load(flip);
     unsigned char *data = stbi_load(path.c_str(), &width, &height, &nrChannels, 0);
@@ -54,12 +54,12 @@ void Texture::loadImage(const std::string &path, bool flip){
     stbi_image_free(data);
 }
 
-void Texture::bind(){
+void texture::bind(){
     glBindTexture(GL_TEXTURE_2D,textureID);
 }
 
 // Method to generate a unicolor texture
-void Texture::generateUnicolorTexture(const glm::vec4 &color, int width, int height) {
+void texture::generateUnicolorTexture(const glm::vec4 &color, int width, int height) {
     glBindTexture(GL_TEXTURE_2D, textureID);
 
     // Create a buffer for the unicolor texture

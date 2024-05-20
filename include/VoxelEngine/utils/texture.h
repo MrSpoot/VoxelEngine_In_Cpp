@@ -6,20 +6,21 @@
 #include <glm/glm.hpp>
 #include "VoxelEngine/utils/stb_image.h"
 
-class Texture {
+class texture {
 public:
+    unsigned int textureID;
     // Constructor
-    Texture();
-    Texture(const glm::vec4 &color, int width, int height);
-    Texture(const std::string &path);
-    Texture(const std::string &path, bool flip);
+    texture();
+    texture(const glm::vec4 &color, int width, int height);
+    texture(const std::string &path);
+    texture(const std::string &path, bool flip);
     // Destructor
-    ~Texture();
+    ~texture();
 
     void bind();
 
 private:
-    unsigned int textureID;
+
     void generateTexture();
     void loadImage(const std::string &path, bool flip);
     void generateUnicolorTexture(const glm::vec4 &color, int width, int height);
