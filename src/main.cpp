@@ -79,7 +79,7 @@ int main()
         return -1;
     }
 
-    shader shader("C:\\Users\\Betterfly\\Documents\\GitHub\\VoxelEngine_In_Cpp\\resources\\shaders\\vertex.glsl", "C:\\Users\\Betterfly\\Documents\\GitHub\\VoxelEngine_In_Cpp\\resources\\shaders\\fragment.glsl");
+    shader shader("../resources/shaders/vertex.glsl", "../resources/shaders/fragment.glsl");
 
     texture texture(glm::vec4(0.36, 0.76, 0.4, 1.0), 8, 8);
     texture.bind();
@@ -109,10 +109,24 @@ int main()
     int simulationWidth = 10;
     int simulationDepth = 10;
 
+    GLuint queryID;
+    glGenQueries(1, &queryID);
+
+    unsigned int buffer;
+    glGenBuffers(1, &buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glBufferData(GL_ARRAY_BUFFER, simulationWidth * simulationDepth * sizeof(glm::mat4), &modelMatrices[0], GL_STATIC_DRAW);
+
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
     {
+        // per-frame time logic
+        // --------------------
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
         float fps = calculateFPS(fpsValues, averageFPS, maxFps);
 
         // input
@@ -137,6 +151,8 @@ int main()
         glm::mat4 view = camera.GetViewMatrix();
         shader.setMat4("view", view);
 
+        glBeginQuery(GL_PRIMITIVES_GENERATED, queryID);
+
         for (unsigned int x = 0; x < simulationWidth; x++)
         {
             for (unsigned int z = 0; z < simulationDepth; z++)
@@ -148,6 +164,13 @@ int main()
                 cube.draw();
             }
         }
+
+        // End query
+        glEndQuery(GL_PRIMITIVES_GENERATED);
+
+        // Get query result
+        GLuint primitivesGenerated = 0;
+        glGetQueryObjectuiv(queryID, GL_QUERY_RESULT, &primitivesGenerated);
 
         glBindVertexArray(0);
 
@@ -181,7 +204,7 @@ int main()
             ImGui::InputInt("Size X", &simulationWidth);
             ImGui::InputInt("Size Y", &simulationDepth);
             ImGui::Text("Cube number: %i",simulationDepth * simulationWidth);
-            ImGui::Text("Triangle render: %i",simulationDepth * simulationWidth * 12);
+            ImGui::Text("Triangle render: %u",primitivesGenerated / 2);
             ImGui::End();
         }
 
@@ -227,7 +250,6 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        std::cout << "ALLO\n";
         camera.ProcessKeyboard(RIGHT, deltaTime);
 
     if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) {
