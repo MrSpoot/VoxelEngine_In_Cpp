@@ -37,6 +37,7 @@ bool cameraLock = true;
 
 bool showSecondWindow = false;
 bool wireframeMode = false;
+bool drawingtype = true;
 
 // timing
 float deltaTime = 0.0f;	// time between current frame and last frame
@@ -112,15 +113,23 @@ int main()
     GLuint queryID;
     glGenQueries(1, &queryID);
 
-    unsigned int buffer;
-    glGenBuffers(1, &buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, simulationWidth * simulationDepth * sizeof(glm::mat4), &modelMatrices[0], GL_STATIC_DRAW);
+//    unsigned int buffer;
+//    glGenBuffers(1, &buffer);
+//    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+//    glBufferData(GL_ARRAY_BUFFER, simulationWidth * simulationDepth * sizeof(glm::mat4), &modelMatrices[0], GL_STATIC_DRAW);
+
+    std::vector<glm::mat4> modelMatrices;
+
+    GLuint instanceVBO;
+    glGenBuffers(1, &instanceVBO);
 
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
     {
+
+        modelMatrices.clear();
+
         // per-frame time logic
         // --------------------
         float currentFrame = static_cast<float>(glfwGetTime());
@@ -151,19 +160,45 @@ int main()
         glm::mat4 view = camera.GetViewMatrix();
         shader.setMat4("view", view);
 
+        shader.setBool("drawingtype", drawingtype);
+
         glBeginQuery(GL_PRIMITIVES_GENERATED, queryID);
 
         for (unsigned int x = 0; x < simulationWidth; x++)
         {
             for (unsigned int z = 0; z < simulationDepth; z++)
             {
-
                 glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
                 model = glm::translate(model, glm::vec3(x*2,-3,z*2));
-                shader.setMat4("model", model);
-                cube.draw();
+
+                if(drawingtype){
+                    shader.setMat4("model", model);
+                    cube.draw();
+                }
+
+                modelMatrices.push_back(model);
             }
         }
+
+        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+        glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), &modelMatrices[0], GL_STATIC_DRAW);
+
+        glBindVertexArray(cube.VAO);
+
+        for (unsigned int i = 0; i < 4; i++) {
+            glEnableVertexAttribArray(3 + i);
+            glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * sizeof(glm::vec4)));
+            glVertexAttribDivisor(3 + i, 1);
+        }
+
+        if(!drawingtype){
+            glBindVertexArray(cube.VAO);
+            glDrawElementsInstanced(GL_TRIANGLES, cube.indices.size(), GL_UNSIGNED_INT, 0, modelMatrices.size());
+
+        }
+
+        glBindVertexArray(0);
+
 
         // End query
         glEndQuery(GL_PRIMITIVES_GENERATED);
@@ -205,6 +240,7 @@ int main()
             ImGui::InputInt("Size Y", &simulationDepth);
             ImGui::Text("Cube number: %i",simulationDepth * simulationWidth);
             ImGui::Text("Triangle render: %u",primitivesGenerated / 2);
+            ImGui::Text("Instanced draw : %u",!drawingtype);
             ImGui::End();
         }
 
@@ -263,6 +299,12 @@ void processInput(GLFWwindow *window)
 
     if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS)
         showSecondWindow = !showSecondWindow;
+
+    if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
+        drawingtype = true;
+
+    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
+        drawingtype = false;
 
 
 }

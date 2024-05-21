@@ -7,12 +7,6 @@
 
 class Cube {
 public:
-    Cube(float size, GLuint textureID);
-
-    void draw();
-
-private:
-    void setupMesh();
 
     float size;
     GLuint textureID;
@@ -20,6 +14,15 @@ private:
 
     std::vector<float> vertices;
     std::vector<unsigned int> indices;
+
+    Cube(float size, GLuint textureID);
+
+    void draw();
+
+private:
+    void setupMesh();
+
+
 };
 
 #endif //VOXELENGINE_CUBE_H
