@@ -18,11 +18,15 @@
 #include "VoxelEngine/utils/texture.h"
 #include "VoxelEngine/components/cube.h"
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+void framebuffer_size_callback(GLFWwindow *window, int width, int height);
+
 void processInput(GLFWwindow *window);
-void mouse_callback(GLFWwindow* window, double xpos, double ypos);
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-float calculateFPS(std::vector<float>& fpsValues, float& averageFPS, float& maxFps);
+
+void mouse_callback(GLFWwindow *window, double xpos, double ypos);
+
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
+
+float calculateFPS(std::vector<float> &fpsValues, float &averageFPS, float &maxFps);
 
 // settings
 const unsigned int SCR_WIDTH = 1280;
@@ -37,15 +41,14 @@ bool cameraLock = true;
 
 bool showSecondWindow = false;
 bool wireframeMode = false;
-bool drawingtype = true;
+bool drawingtype = false;
 
 // timing
-float deltaTime = 0.0f;	// time between current frame and last frame
+float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
 
-int main()
-{
+int main() {
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
@@ -59,9 +62,8 @@ int main()
 
     // glfw window creation
     // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "VoxelEngine", NULL, NULL);
-    if (window == NULL)
-    {
+    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "VoxelEngine", NULL, NULL);
+    if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return -1;
@@ -70,25 +72,43 @@ int main()
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
-    glfwSwapInterval( 0 );
+    glfwSwapInterval(0);
 
     // Glad: load all OpenGL function pointers
     // ---------------------------------------
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
+    if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
 
-    shader shader("../resources/shaders/vertex.glsl", "../resources/shaders/fragment.glsl");
+    class shader shader("../resources/shaders/vertex.glsl", "../resources/shaders/fragment.glsl");
+
+    class shader rayMarchingShader("../resources/shaders/ray-vert.glsl", "../resources/shaders/ray-frag.glsl");
+
+    float quadVertices[] = {
+            -1.0f, -1.0f,
+            1.0f, -1.0f,
+            -1.0f,  1.0f,
+            1.0f,  1.0f,
+    };
+
+    GLuint quadVAO, quadVBO;
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glBindVertexArray(0);
 
     texture texture(glm::vec4(0.36, 0.76, 0.4, 1.0), 8, 8);
     texture.bind();
-
+    
     // uncomment this call to draw in wireframe polygons.
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-    Cube cube(1.0f,texture.textureID);
+    Cube cube(1.0f, texture.textureID);
 
     float i = 0;
 
@@ -98,38 +118,57 @@ int main()
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO &io = ImGui::GetIO();
+    (void) io;
     ImGui::StyleColorsDark();
-    ImGui_ImplGlfw_InitForOpenGL(window,true);
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
     std::vector<float> fpsValues;
     float averageFPS = 0.0f;
     float maxFps = 0.0f;
 
-    int simulationWidth = 10;
-    int simulationDepth = 10;
+    int simulationWidth = 1000;
+    int simulationDepth = 1000;
 
     GLuint queryID;
     glGenQueries(1, &queryID);
 
-//    unsigned int buffer;
-//    glGenBuffers(1, &buffer);
-//    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-//    glBufferData(GL_ARRAY_BUFFER, simulationWidth * simulationDepth * sizeof(glm::mat4), &modelMatrices[0], GL_STATIC_DRAW);
+    int maxInstancedSize = 2000;
 
     std::vector<glm::mat4> modelMatrices;
+    modelMatrices.reserve(simulationWidth * simulationDepth); // Pré-allocation
 
     GLuint instanceVBO;
     glGenBuffers(1, &instanceVBO);
 
+    // Initialisation des matrices de modèle
+    for (unsigned int x = 0; x < simulationWidth; x++) {
+        for (unsigned int z = 0; z < simulationDepth; z++) {
+            glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+            model = glm::translate(model, glm::vec3(x, -3, z));
+            modelMatrices.push_back(model);
+        }
+    }
+
+    // Préparation du buffer d'instances
+    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+    glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), &modelMatrices[0], GL_STATIC_DRAW);
+
+    glBindVertexArray(cube.VAO);
+
+    for (unsigned int i = 0; i < 4; i++) {
+        glEnableVertexAttribArray(3 + i);
+        glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void *) (i * sizeof(glm::vec4)));
+        glVertexAttribDivisor(3 + i, 1);
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
     // render loop
     // -----------
-    while (!glfwWindowShouldClose(window))
-    {
-
-        modelMatrices.clear();
-
+    while (!glfwWindowShouldClose(window)) {
         // per-frame time logic
         // --------------------
         float currentFrame = static_cast<float>(glfwGetTime());
@@ -144,60 +183,52 @@ int main()
 
         // render
         // ------
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // draw our first triangle
-        shader.use();
-
-        glm::vec3 lightpos = glm::vec3(0.0,15.0,0.0);
-
-        shader.setVec3("lightPos",lightpos);
-
-        glm::mat4 proj = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
-        shader.setMat4("projection", proj);
-
-        glm::mat4 view = camera.GetViewMatrix();
-        shader.setMat4("view", view);
-
-        shader.setBool("drawingtype", drawingtype);
 
         glBeginQuery(GL_PRIMITIVES_GENERATED, queryID);
 
-        for (unsigned int x = 0; x < simulationWidth; x++)
-        {
-            for (unsigned int z = 0; z < simulationDepth; z++)
-            {
-                glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-                model = glm::translate(model, glm::vec3(x*2,-3,z*2));
+        // draw our first triangle
+        if(false) {
+            shader.use();
 
-                if(drawingtype){
-                    shader.setMat4("model", model);
-                    cube.draw();
-                }
+            glm::vec3 lightpos = glm::vec3(0.0, 15.0, 0.0);
+            shader.setVec3("lightPos", lightpos);
 
-                modelMatrices.push_back(model);
-            }
-        }
+            glm::mat4 proj = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
+                                              10000.0f);
+            shader.setMat4("projection", proj);
 
-        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-        glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), &modelMatrices[0], GL_STATIC_DRAW);
+            glm::mat4 view = camera.GetViewMatrix();
+            shader.setMat4("view", view);
 
-        glBindVertexArray(cube.VAO);
 
-        for (unsigned int i = 0; i < 4; i++) {
-            glEnableVertexAttribArray(3 + i);
-            glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * sizeof(glm::vec4)));
-            glVertexAttribDivisor(3 + i, 1);
-        }
-
-        if(!drawingtype){
             glBindVertexArray(cube.VAO);
-            glDrawElementsInstanced(GL_TRIANGLES, cube.indices.size(), GL_UNSIGNED_INT, 0, modelMatrices.size());
+            for (int i = 0; i < modelMatrices.size(); i += maxInstancedSize) {
+                int count = std::min(maxInstancedSize, static_cast<int>(modelMatrices.size() - i));
 
+                // Mettre à jour les matrices de modèle pour ce lot
+                glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, count * sizeof(glm::mat4), &modelMatrices[i]);
+
+                // Appel de rendu pour ce lot
+                glDrawElementsInstanced(GL_TRIANGLES, cube.indices.size(), GL_UNSIGNED_INT, 0, count);
+            }
+
+            glBindVertexArray(0);
+        }else{
+            rayMarchingShader.use();
+            rayMarchingShader.setVec3("camPos", camera.Position);
+            rayMarchingShader.setMat4("view", camera.GetViewMatrix());
+            rayMarchingShader.setMat4("projection", glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f));
+            rayMarchingShader.setFloat("time", currentFrame);
+
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            glBindVertexArray(0);
         }
 
-        glBindVertexArray(0);
 
 
         // End query
@@ -207,25 +238,25 @@ int main()
         GLuint primitivesGenerated = 0;
         glGetQueryObjectuiv(queryID, GL_QUERY_RESULT, &primitivesGenerated);
 
-        glBindVertexArray(0);
-
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::SetNextWindowSize(ImVec2(325,125));
+        ImGui::SetNextWindowSize(ImVec2(325, 125));
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.3);
         // Begin window with no title bar, no resize, no move, no scrollbar, no collapse, no nav, no background
-        ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                                        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav ;
+        ImGuiWindowFlags window_flags =
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav;
 
         ImGui::PushStyleColor(ImGuiCol_PlotLines, ImVec4(0.8f, 0.1f, 0.1f, 1.0f)); // Green line
         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, 0.3f));
 
         ImGui::Begin("Performance", nullptr, window_flags);
         ImGui::Text("FPS: %.1f", fps);
-        ImGui::PlotLines("FPS Over Time", fpsValues.data(), fpsValues.size(), 0, nullptr, 0.0f, maxFps + maxFps * 0.1, ImVec2(0, 80));
+        ImGui::PlotLines("FPS Over Time", fpsValues.data(), fpsValues.size(), 0, nullptr, 0.0f, maxFps + maxFps * 0.1,
+                         ImVec2(0, 80));
 
         ImGui::PopStyleColor(2);
 
@@ -238,9 +269,10 @@ int main()
             ImGui::Checkbox("Wireframe Mode", &wireframeMode);
             ImGui::InputInt("Size X", &simulationWidth);
             ImGui::InputInt("Size Y", &simulationDepth);
-            ImGui::Text("Cube number: %i",simulationDepth * simulationWidth);
-            ImGui::Text("Triangle render: %u",primitivesGenerated / 2);
-            ImGui::Text("Instanced draw : %u",!drawingtype);
+            ImGui::InputInt("Max draw per instance", &maxInstancedSize);
+            ImGui::Text("Cube number: %i", simulationDepth * simulationWidth);
+            ImGui::Text("Triangle render: %u", primitivesGenerated / 2);
+            ImGui::Text("Instanced draw : %u", !drawingtype);
             ImGui::End();
         }
 
@@ -274,8 +306,7 @@ int main()
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow *window)
-{
+void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
@@ -292,7 +323,7 @@ void processInput(GLFWwindow *window)
         cameraLock = false;
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
-    if (glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS){
+    if (glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS) {
         cameraLock = true;
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
@@ -305,14 +336,11 @@ void processInput(GLFWwindow *window)
 
     if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
         drawingtype = false;
-
-
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
+void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
     // make sure the viewport matches the new window dimensions; note that width and
     // height will be significantly larger than specified on retina displays.
     glViewport(0, 0, width, height);
@@ -320,13 +348,11 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 // glfw: whenever the mouse moves, this callback is called
 // -------------------------------------------------------
-void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
-{
+void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
     float xpos = static_cast<float>(xposIn);
     float ypos = static_cast<float>(yposIn);
 
-    if (firstMouse)
-    {
+    if (firstMouse) {
         lastX = xpos;
         lastY = ypos;
         firstMouse = false;
@@ -338,19 +364,18 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
     lastX = xpos;
     lastY = ypos;
 
-    if(!cameraLock){
+    if (!cameraLock) {
         camera.ProcessMouseMovement(xoffset, yoffset);
     }
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
-{
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
-float calculateFPS(std::vector<float>& fpsValues, float& averageFPS, float& maxFps) {
+float calculateFPS(std::vector<float> &fpsValues, float &averageFPS, float &maxFps) {
     static float lastTime = glfwGetTime();
     static int frameCount = 0;
 
@@ -367,17 +392,14 @@ float calculateFPS(std::vector<float>& fpsValues, float& averageFPS, float& maxF
 
         averageFPS = std::accumulate(fpsValues.begin(), fpsValues.end(), 0.0f) / fpsValues.size();
 
-        maxFps = *std::max_element(fpsValues.begin(),fpsValues.end());
+        maxFps = *std::max_element(fpsValues.begin(), fpsValues.end());
 
         lastTime = currentTime;
         frameCount = 0;
-
     }
-    if(fpsValues.size() > 0){
-        return fpsValues[fpsValues.size()-1];
-    }else{
+    if (fpsValues.size() > 0) {
+        return fpsValues[fpsValues.size() - 1];
+    } else {
         return 0.0f;
     }
-
-
 }
