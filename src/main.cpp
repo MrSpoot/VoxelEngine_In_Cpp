@@ -85,26 +85,9 @@ int main() {
 
     class shader rayMarchingShader("../resources/shaders/ray-vert.glsl", "../resources/shaders/ray-frag.glsl");
 
-    float quadVertices[] = {
-            -1.0f, -1.0f,
-            1.0f, -1.0f,
-            -1.0f,  1.0f,
-            1.0f,  1.0f,
-    };
-
-    GLuint quadVAO, quadVBO;
-    glGenVertexArrays(1, &quadVAO);
-    glGenBuffers(1, &quadVBO);
-    glBindVertexArray(quadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    glBindVertexArray(0);
-
     texture texture(glm::vec4(0.36, 0.76, 0.4, 1.0), 8, 8);
     texture.bind();
-    
+
     // uncomment this call to draw in wireframe polygons.
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
@@ -134,7 +117,7 @@ int main() {
     GLuint queryID;
     glGenQueries(1, &queryID);
 
-    int maxInstancedSize = 2000;
+    int maxInstancedSize = 2500;
 
     std::vector<glm::mat4> modelMatrices;
     modelMatrices.reserve(simulationWidth * simulationDepth); // Pré-allocation
@@ -190,44 +173,33 @@ int main() {
         glBeginQuery(GL_PRIMITIVES_GENERATED, queryID);
 
         // draw our first triangle
-        if(false) {
-            shader.use();
+        shader.use();
 
-            glm::vec3 lightpos = glm::vec3(0.0, 15.0, 0.0);
-            shader.setVec3("lightPos", lightpos);
+        glm::vec3 lightpos = glm::vec3(0.0, 15.0, 0.0);
+        shader.setVec3("lightPos", lightpos);
 
-            glm::mat4 proj = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
-                                              10000.0f);
-            shader.setMat4("projection", proj);
+        glm::mat4 proj = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
+                                          10000.0f);
+        shader.setMat4("projection", proj);
 
-            glm::mat4 view = camera.GetViewMatrix();
-            shader.setMat4("view", view);
+        glm::mat4 view = camera.GetViewMatrix();
+        shader.setMat4("view", view);
 
 
-            glBindVertexArray(cube.VAO);
-            for (int i = 0; i < modelMatrices.size(); i += maxInstancedSize) {
-                int count = std::min(maxInstancedSize, static_cast<int>(modelMatrices.size() - i));
+        glBindVertexArray(cube.VAO);
+        for (int i = 0; i < modelMatrices.size(); i += maxInstancedSize) {
+            int count = std::min(maxInstancedSize, static_cast<int>(modelMatrices.size() - i));
 
-                // Mettre à jour les matrices de modèle pour ce lot
-                glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-                glBufferSubData(GL_ARRAY_BUFFER, 0, count * sizeof(glm::mat4), &modelMatrices[i]);
+            // Mettre à jour les matrices de modèle pour ce lot
+            glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, count * sizeof(glm::mat4), &modelMatrices[i]);
 
-                // Appel de rendu pour ce lot
-                glDrawElementsInstanced(GL_TRIANGLES, cube.indices.size(), GL_UNSIGNED_INT, 0, count);
-            }
-
-            glBindVertexArray(0);
-        }else{
-            rayMarchingShader.use();
-            rayMarchingShader.setVec3("camPos", camera.Position);
-            rayMarchingShader.setMat4("view", camera.GetViewMatrix());
-            rayMarchingShader.setMat4("projection", glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f));
-            rayMarchingShader.setFloat("time", currentFrame);
-
-            glBindVertexArray(quadVAO);
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-            glBindVertexArray(0);
+            // Appel de rendu pour ce lot
+            glDrawElementsInstanced(GL_TRIANGLES, cube.indices.size(), GL_UNSIGNED_INT, 0, count);
         }
+
+        glBindVertexArray(0);
+
 
 
 
