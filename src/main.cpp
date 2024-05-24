@@ -7,16 +7,13 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "utils/Camera.h"
+#include "utils/Shader.h"
 
 #include <iostream>
 #include <vector>
 #include <numeric>
 #include <algorithm>
-#include "VoxelEngine/utils/shader.h"
-#include "VoxelEngine/utils/stb_image.h"
-#include "VoxelEngine/utils/camera.h"
-#include "VoxelEngine/utils/texture.h"
-#include "VoxelEngine/components/cube.h"
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 
@@ -33,15 +30,12 @@ const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
 // camera
-camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 bool cameraLock = true;
-
-bool showSecondWindow = false;
 bool wireframeMode = false;
-bool drawingtype = false;
 
 // timing
 float deltaTime = 0.0f;    // time between current frame and last frame
@@ -81,24 +75,6 @@ int main() {
         return -1;
     }
 
-    class shader shader("../resources/shaders/vertex.glsl", "../resources/shaders/fragment.glsl");
-
-    class shader rayMarchingShader("../resources/shaders/ray-vert.glsl", "../resources/shaders/ray-frag.glsl");
-
-    texture texture(glm::vec4(0.36, 0.76, 0.4, 1.0), 8, 8);
-    texture.bind();
-
-    // uncomment this call to draw in wireframe polygons.
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-    Cube cube(1.0f, texture.textureID);
-
-    float i = 0;
-
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_FRONT);
-
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
@@ -111,43 +87,46 @@ int main() {
     float averageFPS = 0.0f;
     float maxFps = 0.0f;
 
-    int simulationWidth = 1000;
-    int simulationDepth = 1000;
+    float vertices[] = {
+            // positions
+            1.0f,  1.0f, 0.0f,
+            1.0f, -1.0f, 0.0f,
+            -1.0f, -1.0f, 0.0f,
+            -1.0f,  1.0f, 0.0f,
+    };
+    unsigned int indices[] = {
+            0, 1, 3,
+            1, 2, 3,
+    };
 
-    GLuint queryID;
-    glGenQueries(1, &queryID);
+    unsigned int VBO, VAO, EBO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
 
-    int maxInstancedSize = 2500;
+    glBindVertexArray(VAO);
 
-    std::vector<glm::mat4> modelMatrices;
-    modelMatrices.reserve(simulationWidth * simulationDepth); // Pré-allocation
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    GLuint instanceVBO;
-    glGenBuffers(1, &instanceVBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-    // Initialisation des matrices de modèle
-    for (unsigned int x = 0; x < simulationWidth; x++) {
-        for (unsigned int z = 0; z < simulationDepth; z++) {
-            glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-            model = glm::translate(model, glm::vec3(x, -3, z));
-            modelMatrices.push_back(model);
-        }
-    }
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
 
-    // Préparation du buffer d'instances
-    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-    glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), &modelMatrices[0], GL_STATIC_DRAW);
-
-    glBindVertexArray(cube.VAO);
-
-    for (unsigned int i = 0; i < 4; i++) {
-        glEnableVertexAttribArray(3 + i);
-        glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void *) (i * sizeof(glm::vec4)));
-        glVertexAttribDivisor(3 + i, 1);
-    }
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    // Unbind VAO
     glBindVertexArray(0);
+
+    Shader shader("../resources/shaders/raycast.vert","../resources/shaders/raycast.frag");
+
+    shader.use();
+
+    glm::vec3 voxelWorldMin = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 voxelWorldMax = glm::vec3(32.0f, 32.0f, 32.0f);
+    float voxelSize = 0.5f;
+
+
 
     // render loop
     // -----------
@@ -169,52 +148,24 @@ int main() {
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
-        glBeginQuery(GL_PRIMITIVES_GENERATED, queryID);
-
-        // draw our first triangle
         shader.use();
 
-        glm::vec3 lightpos = glm::vec3(0.0, 15.0, 0.0);
-        shader.setVec3("lightPos", lightpos);
+        shader.setVec3("camPos",camera.Position);
+        shader.setVec3("camDir",camera.Front);
+        shader.setVec3("camRight",camera.Right);
+        shader.setVec3("camUp",camera.Up);
+        shader.setVec3("voxelWorldMin",voxelWorldMin);
+        shader.setVec3("voxelWorldMax",voxelWorldMax);
+        shader.setFloat("voxelSize",voxelSize);
 
-        glm::mat4 proj = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
-                                          10000.0f);
-        shader.setMat4("projection", proj);
-
-        glm::mat4 view = camera.GetViewMatrix();
-        shader.setMat4("view", view);
-
-
-        glBindVertexArray(cube.VAO);
-        for (int i = 0; i < modelMatrices.size(); i += maxInstancedSize) {
-            int count = std::min(maxInstancedSize, static_cast<int>(modelMatrices.size() - i));
-
-            // Mettre à jour les matrices de modèle pour ce lot
-            glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, count * sizeof(glm::mat4), &modelMatrices[i]);
-
-            // Appel de rendu pour ce lot
-            glDrawElementsInstanced(GL_TRIANGLES, cube.indices.size(), GL_UNSIGNED_INT, 0, count);
-        }
-
-        glBindVertexArray(0);
-
-
-
-
-        // End query
-        glEndQuery(GL_PRIMITIVES_GENERATED);
-
-        // Get query result
-        GLuint primitivesGenerated = 0;
-        glGetQueryObjectuiv(queryID, GL_QUERY_RESULT, &primitivesGenerated);
+        glBindVertexArray(VAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::SetNextWindowSize(ImVec2(325, 125));
+        ImGui::SetNextWindowSize(ImVec2(325, 175));
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.3);
         // Begin window with no title bar, no resize, no move, no scrollbar, no collapse, no nav, no background
@@ -234,19 +185,8 @@ int main() {
 
         ImGui::Text("Average FPS: %.1f", averageFPS);
         ImGui::Text("Max FPS: %.1f", maxFps);
+        ImGui::Checkbox(" Wireframe",&wireframeMode);
         ImGui::End();
-
-        if (showSecondWindow) {
-            ImGui::Begin("Options");
-            ImGui::Checkbox("Wireframe Mode", &wireframeMode);
-            ImGui::InputInt("Size X", &simulationWidth);
-            ImGui::InputInt("Size Y", &simulationDepth);
-            ImGui::InputInt("Max draw per instance", &maxInstancedSize);
-            ImGui::Text("Cube number: %i", simulationDepth * simulationWidth);
-            ImGui::Text("Triangle render: %u", primitivesGenerated / 2);
-            ImGui::Text("Instanced draw : %u", !drawingtype);
-            ImGui::End();
-        }
 
         // Set wireframe mode
         if (wireframeMode) {
@@ -262,9 +202,12 @@ int main() {
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
         glfwPollEvents();
-
-        i++;
     }
+
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO);
+    glDeleteProgram(shader.ID);
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
@@ -299,15 +242,6 @@ void processInput(GLFWwindow *window) {
         cameraLock = true;
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
-
-    if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS)
-        showSecondWindow = !showSecondWindow;
-
-    if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
-        drawingtype = true;
-
-    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
-        drawingtype = false;
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes

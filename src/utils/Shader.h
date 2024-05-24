@@ -9,12 +9,12 @@
 #include <sstream>
 #include <iostream>
 
-class shader
+class Shader
 {
 public:
 
     unsigned int ID;
-    shader(const GLchar* vertexPath, const GLchar* fragmentPath);
+    Shader(const GLchar* vertexPath, const GLchar* fragmentPath);
     void use();
 
     void setBool(const std::string &name, bool value) const;
