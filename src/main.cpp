@@ -9,6 +9,7 @@
 #include "imgui_impl_opengl3.h"
 #include "utils/Camera.h"
 #include "utils/Shader.h"
+#include "utils/OctreeNode.h"
 
 #include <iostream>
 #include <vector>
@@ -30,7 +31,7 @@ const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, -3.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -42,11 +43,115 @@ float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
 
+const int VOXEL_GRID_SIZE = 32;
+
+void subdivide(OctreeNode* node) {
+    glm::vec3 center = (node->minBound + node->maxBound) * 0.5f;
+    glm::vec3 size = (node->maxBound - node->minBound) * 0.5f;
+
+    for (int i = 0; i < 8; ++i) {
+        glm::vec3 offset(
+                (i & 1) ? size.x : 0.0f,
+                (i & 2) ? size.y : 0.0f,
+                (i & 4) ? size.z : 0.0f
+        );
+        glm::vec3 minB = node->minBound + offset;
+        glm::vec3 maxB = minB + size;
+        node->children[i] = new OctreeNode(minB, maxB);
+    }
+}
+
+void addVoxel(OctreeNode* node, const glm::vec3& position, const Voxel& voxel, int depth) {
+    if (depth == 0 || node->isLeaf()) {
+        if (node->voxel == nullptr) {
+            node->voxel = new Voxel(voxel);
+        } else {
+            subdivide(node);
+            addVoxel(node, position, voxel, depth - 1);
+        }
+        return;
+    }
+
+    glm::vec3 center = (node->minBound + node->maxBound) * 0.5f;
+    int index = (position.x > center.x) | ((position.y > center.y) << 1) | ((position.z > center.z) << 2);
+    addVoxel(node->children[index], position, voxel, depth - 1);
+}
+
+void initVoxels(std::vector<Voxel>& voxels) {
+    voxels.resize(VOXEL_GRID_SIZE * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE);
+    for (int x = 0; x < VOXEL_GRID_SIZE; ++x) {
+        for (int y = 0; y < VOXEL_GRID_SIZE; ++y) {
+            for (int z = 0; z < VOXEL_GRID_SIZE; ++z) {
+                    int index = x + y * VOXEL_GRID_SIZE + z * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE;
+                    voxels[index].color = glm::vec3(static_cast<float>(rand()) / RAND_MAX,
+                                                    static_cast<float>(rand()) / RAND_MAX,
+                                                    static_cast<float>(rand()) / RAND_MAX);
+                        //voxels[index].color = glm::vec3(0.95,0.48,0.06);
+                    voxels[index].isActive = y == 0;
+            }
+        }
+    }
+}
+
+OctreeNode* initOctree(const std::vector<Voxel>& voxels, int depth) {
+    OctreeNode* root = new OctreeNode(glm::vec3(0.0f), glm::vec3(VOXEL_GRID_SIZE));
+    for (int x = 0; x < VOXEL_GRID_SIZE; ++x) {
+        for (int y = 0; y < VOXEL_GRID_SIZE; ++y) {
+            for (int z = 0; z < VOXEL_GRID_SIZE; ++z) {
+                int index = x + y * VOXEL_GRID_SIZE + z * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE;
+                if (voxels[index].isActive) {
+                    addVoxel(root, glm::vec3(x, y, z), voxels[index], depth);
+                }
+            }
+        }
+    }
+    return root;
+}
+
+void serializeOctree(OctreeNode* node, std::vector<glm::vec4>& data) {
+    if (node->isLeaf()) {
+        if (node->voxel != nullptr) {
+            data.push_back(glm::vec4(node->voxel->color, 1.0f));
+        } else {
+            data.push_back(glm::vec4(0.0f));
+        }
+    } else {
+        for (int i = 0; i < 8; ++i) {
+            serializeOctree(node->children[i], data);
+        }
+    }
+}
+
+GLuint createOctreeSSBO(OctreeNode* root) {
+    std::vector<glm::vec4> data;
+    serializeOctree(root, data);
+
+    GLuint ssbo;
+    glGenBuffers(1, &ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, data.size() * sizeof(glm::vec4), data.data(), GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    return ssbo;
+}
+
+
+GLuint createSSBO(const std::vector<Voxel>& voxels) {
+    GLuint ssbo;
+    glGenBuffers(1, &ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, voxels.size() * sizeof(Voxel), voxels.data(), GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo); // Lier le SSBO à l'index 0
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    return ssbo;
+}
+
+
 int main() {
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
@@ -75,13 +180,25 @@ int main() {
         return -1;
     }
 
+    const GLubyte* renderer = glGetString(GL_RENDERER);
+    const GLubyte* version = glGetString(GL_VERSION);
+    std::cout << "Renderer: " << renderer << std::endl;
+    std::cout << "OpenGL version supported: " << version << std::endl;
+
+    // Vérifier si la version d'OpenGL est suffisante
+    if (GLVersion.major < 4 || (GLVersion.major == 4 && GLVersion.minor < 3)) {
+        std::cerr << "OpenGL 4.3 or higher is required for SSBO" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
     (void) io;
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init("#version 330");
+    ImGui_ImplOpenGL3_Init("#version 430");
 
     std::vector<float> fpsValues;
     float averageFPS = 0.0f;
@@ -118,15 +235,21 @@ int main() {
     // Unbind VAO
     glBindVertexArray(0);
 
+    std::vector<Voxel> voxels;
+    initVoxels(voxels);
+    OctreeNode* root = initOctree(voxels, 4);
+    GLuint ssbo = createSSBO(voxels);
+
     Shader shader("../resources/shaders/raycast.vert","../resources/shaders/raycast.frag");
 
     shader.use();
 
+    shader.setFloat("fov", glm::radians(90.0f));
+    shader.setFloat("aspectRatio", (float)SCR_WIDTH/(float)SCR_HEIGHT);
+
     glm::vec3 voxelWorldMin = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 voxelWorldMax = glm::vec3(32.0f, 32.0f, 32.0f);
-    float voxelSize = 0.5f;
-
-
+    float voxelSize = 1.0f;
 
     // render loop
     // -----------
@@ -150,13 +273,10 @@ int main() {
 
         shader.use();
 
-        shader.setVec3("camPos",camera.Position);
-        shader.setVec3("camDir",camera.Front);
-        shader.setVec3("camRight",camera.Right);
-        shader.setVec3("camUp",camera.Up);
-        shader.setVec3("voxelWorldMin",voxelWorldMin);
-        shader.setVec3("voxelWorldMax",voxelWorldMax);
-        shader.setFloat("voxelSize",voxelSize);
+        shader.setVec3("camPos", camera.Position);
+        shader.setVec3("camDir", camera.Front);
+        shader.setVec3("camRight", camera.Right);
+        shader.setVec3("camUp", camera.Up);
 
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -278,7 +398,8 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
-    camera.ProcessMouseScroll(static_cast<float>(yoffset));
+    camera.setSpeed(camera.MovementSpeed + (yoffset * 0.1));
+    //camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
 float calculateFPS(std::vector<float> &fpsValues, float &averageFPS, float &maxFps) {
