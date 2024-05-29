@@ -43,7 +43,7 @@ float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
 
-const int VOXEL_GRID_SIZE = 32;
+const int VOXEL_GRID_SIZE = 64;
 
 void subdivide(OctreeNode* node) {
     glm::vec3 center = (node->minBound + node->maxBound) * 0.5f;
@@ -78,7 +78,7 @@ void addVoxel(OctreeNode* node, const glm::vec3& position, const Voxel& voxel, i
 }
 
 void initVoxels(std::vector<Voxel>& voxels) {
-    voxels.resize(VOXEL_GRID_SIZE * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE);
+
     for (int x = 0; x < VOXEL_GRID_SIZE; ++x) {
         for (int y = 0; y < VOXEL_GRID_SIZE; ++y) {
             for (int z = 0; z < VOXEL_GRID_SIZE; ++z) {
@@ -87,7 +87,9 @@ void initVoxels(std::vector<Voxel>& voxels) {
                                                     static_cast<float>(rand()) / RAND_MAX,
                                                     static_cast<float>(rand()) / RAND_MAX);
                         //voxels[index].color = glm::vec3(0.95,0.48,0.06);
-                    voxels[index].isActive = y == 0;
+                    //voxels[index].isActive = (rand() % 50) == 0;
+                    voxels[index].isActive = y == 1;
+                    //voxels[index].isActive = true;
             }
         }
     }
@@ -236,6 +238,7 @@ int main() {
     glBindVertexArray(0);
 
     std::vector<Voxel> voxels;
+    voxels.resize(VOXEL_GRID_SIZE * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE);
     initVoxels(voxels);
     OctreeNode* root = initOctree(voxels, 4);
     GLuint ssbo = createSSBO(voxels);
@@ -277,6 +280,7 @@ int main() {
         shader.setVec3("camDir", camera.Front);
         shader.setVec3("camRight", camera.Right);
         shader.setVec3("camUp", camera.Up);
+        shader.setFloat("time",glfwGetTime());
 
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -398,7 +402,7 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
-    camera.setSpeed(camera.MovementSpeed + (yoffset * 0.1));
+    camera.setSpeed(camera.MovementSpeed + (yoffset * 0.25));
     //camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 

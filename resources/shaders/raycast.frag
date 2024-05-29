@@ -10,6 +10,7 @@ uniform vec3 camRight;    // Vecteur à droite de la caméra
 uniform vec3 camUp;       // Vecteur vers le haut de la caméra
 uniform float fov;        // Champ de vision (en radians)
 uniform float aspectRatio; // Rapport d'aspect de l'écran (width / height)
+uniform float time;
 
 struct Voxel {
     vec3 color;
@@ -24,8 +25,7 @@ layout(std430, binding = 0) buffer Voxels {
 // Position et taille de la grille de voxels
 const vec3 voxelGridMin = vec3(0.0, 0.0, 0.0);
 const float voxelSize = 1.0;
-const int voxelGridSize = 32;
-
+const int voxelGridSize = 64;
 
 float intersectVoxel(vec3 ro, vec3 rd, vec3 voxelPos, float voxelSize) {
     vec3 invDir = 1.0 / rd;
@@ -41,6 +41,10 @@ float intersectVoxel(vec3 ro, vec3 rd, vec3 voxelPos, float voxelSize) {
     return (tmax >= max(tmin, 0.0)) ? tmin : -1.0;
 }
 
+float getSinusoidalValue(float x) {
+    return (voxelGridSize / 2) * sin(x) + (voxelGridSize / 2);
+}
+
 void main() {
     vec2 uv = TexCoords * 2.0 - 1.0;
     uv.x *= aspectRatio;
@@ -48,8 +52,7 @@ void main() {
     vec3 rayDir = normalize(camDir + uv.x * tan(fov / 2.0) * camRight + uv.y * tan(fov / 2.0) * camUp);
     vec3 rayOrigin = camPos;
 
-    //vec3 voxelPos = vec3(1.0);
-    vec3 voxelPos = floor((rayOrigin) / voxelSize) * voxelSize;
+    vec3 voxelPos = floor((rayOrigin / voxelSize) * voxelSize);
     vec3 step = sign(rayDir) * voxelSize;
     vec3 tMax = ((voxelPos + step * 0.5 + step * 0.5 * sign(rayDir) - rayOrigin) / rayDir);
     vec3 tDelta = abs(step / rayDir);
@@ -57,12 +60,20 @@ void main() {
     for (int i = 0; i < 256; i++) {
         float t = intersectVoxel(rayOrigin, rayDir, voxelPos, voxelSize);
         if (t > 0.0) {
-            int index = int(voxelPos.x) + int(voxelPos.y) * voxelGridSize + int(voxelPos.z) * voxelGridSize * voxelGridSize;
-            if (voxels[index].isActive) {
-                FragColor = vec4(voxels[index].color, 1.0);
-                return;
+            int indexX = int(voxelPos.x / voxelSize);
+            int indexY = int(voxelPos.y / voxelSize);
+            int indexZ = int(voxelPos.z / voxelSize);
+
+            if (indexX >= 0 && indexX < voxelGridSize && indexY >= 0 && indexY < voxelGridSize && indexZ >= 0 && indexZ < voxelGridSize) {
+                int index = indexX + indexY * voxelGridSize + indexZ * voxelGridSize * voxelGridSize;
+                if (voxels[index].isActive) {
+                    FragColor = vec4(voxels[index].color, 1.0);
+                    FragColor = vec4(float(voxelPos.x) / voxelGridSize, float(voxelPos.y) / voxelGridSize, float(voxelPos.z) / voxelGridSize, 1.0);
+                    return;
+                }
             }
         }
+
         if (tMax.x < tMax.y && tMax.x < tMax.z) {
             voxelPos.x += step.x;
             tMax.x += tDelta.x;
@@ -76,7 +87,4 @@ void main() {
     }
 
     FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-
-    // Pour l'instant, nous affichons simplement la direction du rayon comme couleur
-    //FragColor = vec4(rayDir * 0.5 + 0.5, 1.0); // Convertir de [-1, 1] à [0, 1]
 }
