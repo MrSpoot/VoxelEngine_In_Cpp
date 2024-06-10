@@ -9,7 +9,7 @@
 #include <glm/glm.hpp>
 
 struct Voxel {
-    glm::vec3 color;
+    float color[3];
     bool isActive;
 };
 

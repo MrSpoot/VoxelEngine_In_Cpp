@@ -42,40 +42,7 @@ bool wireframeMode = false;
 float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
-
 const int VOXEL_GRID_SIZE = 64;
-
-void subdivide(OctreeNode* node) {
-    glm::vec3 center = (node->minBound + node->maxBound) * 0.5f;
-    glm::vec3 size = (node->maxBound - node->minBound) * 0.5f;
-
-    for (int i = 0; i < 8; ++i) {
-        glm::vec3 offset(
-                (i & 1) ? size.x : 0.0f,
-                (i & 2) ? size.y : 0.0f,
-                (i & 4) ? size.z : 0.0f
-        );
-        glm::vec3 minB = node->minBound + offset;
-        glm::vec3 maxB = minB + size;
-        node->children[i] = new OctreeNode(minB, maxB);
-    }
-}
-
-void addVoxel(OctreeNode* node, const glm::vec3& position, const Voxel& voxel, int depth) {
-    if (depth == 0 || node->isLeaf()) {
-        if (node->voxel == nullptr) {
-            node->voxel = new Voxel(voxel);
-        } else {
-            subdivide(node);
-            addVoxel(node, position, voxel, depth - 1);
-        }
-        return;
-    }
-
-    glm::vec3 center = (node->minBound + node->maxBound) * 0.5f;
-    int index = (position.x > center.x) | ((position.y > center.y) << 1) | ((position.z > center.z) << 2);
-    addVoxel(node->children[index], position, voxel, depth - 1);
-}
 
 void initVoxels(std::vector<Voxel>& voxels) {
 
@@ -83,60 +50,18 @@ void initVoxels(std::vector<Voxel>& voxels) {
         for (int y = 0; y < VOXEL_GRID_SIZE; ++y) {
             for (int z = 0; z < VOXEL_GRID_SIZE; ++z) {
                     int index = x + y * VOXEL_GRID_SIZE + z * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE;
-                    voxels[index].color = glm::vec3(static_cast<float>(rand()) / RAND_MAX,
-                                                    static_cast<float>(rand()) / RAND_MAX,
-                                                    static_cast<float>(rand()) / RAND_MAX);
+                    voxels[index].color[0] = static_cast<float>(rand()) / RAND_MAX;
+                    voxels[index].color[1] = static_cast<float>(rand()) / RAND_MAX;
+                    voxels[index].color[2] = static_cast<float>(rand()) / RAND_MAX;
+
                         //voxels[index].color = glm::vec3(0.95,0.48,0.06);
-                    //voxels[index].isActive = (rand() % 50) == 0;
-                    voxels[index].isActive = y == 1;
+                    voxels[index].isActive = (rand() % 50) == 0;
+                    //voxels[index].isActive = y == 1;
                     //voxels[index].isActive = true;
             }
         }
     }
 }
-
-OctreeNode* initOctree(const std::vector<Voxel>& voxels, int depth) {
-    OctreeNode* root = new OctreeNode(glm::vec3(0.0f), glm::vec3(VOXEL_GRID_SIZE));
-    for (int x = 0; x < VOXEL_GRID_SIZE; ++x) {
-        for (int y = 0; y < VOXEL_GRID_SIZE; ++y) {
-            for (int z = 0; z < VOXEL_GRID_SIZE; ++z) {
-                int index = x + y * VOXEL_GRID_SIZE + z * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE;
-                if (voxels[index].isActive) {
-                    addVoxel(root, glm::vec3(x, y, z), voxels[index], depth);
-                }
-            }
-        }
-    }
-    return root;
-}
-
-void serializeOctree(OctreeNode* node, std::vector<glm::vec4>& data) {
-    if (node->isLeaf()) {
-        if (node->voxel != nullptr) {
-            data.push_back(glm::vec4(node->voxel->color, 1.0f));
-        } else {
-            data.push_back(glm::vec4(0.0f));
-        }
-    } else {
-        for (int i = 0; i < 8; ++i) {
-            serializeOctree(node->children[i], data);
-        }
-    }
-}
-
-GLuint createOctreeSSBO(OctreeNode* root) {
-    std::vector<glm::vec4> data;
-    serializeOctree(root, data);
-
-    GLuint ssbo;
-    glGenBuffers(1, &ssbo);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, data.size() * sizeof(glm::vec4), data.data(), GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    return ssbo;
-}
-
 
 GLuint createSSBO(const std::vector<Voxel>& voxels) {
     GLuint ssbo;
@@ -240,7 +165,6 @@ int main() {
     std::vector<Voxel> voxels;
     voxels.resize(VOXEL_GRID_SIZE * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE);
     initVoxels(voxels);
-    OctreeNode* root = initOctree(voxels, 4);
     GLuint ssbo = createSSBO(voxels);
 
     Shader shader("../resources/shaders/raycast.vert","../resources/shaders/raycast.frag");
@@ -289,7 +213,7 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::SetNextWindowSize(ImVec2(325, 175));
+        ImGui::SetNextWindowSize(ImVec2(325, 150));
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.3);
         // Begin window with no title bar, no resize, no move, no scrollbar, no collapse, no nav, no background
@@ -309,7 +233,6 @@ int main() {
 
         ImGui::Text("Average FPS: %.1f", averageFPS);
         ImGui::Text("Max FPS: %.1f", maxFps);
-        ImGui::Checkbox(" Wireframe",&wireframeMode);
         ImGui::End();
 
         // Set wireframe mode

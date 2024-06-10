@@ -13,7 +13,7 @@ uniform float aspectRatio; // Rapport d'aspect de l'écran (width / height)
 uniform float time;
 
 struct Voxel {
-    vec3 color;
+    float color[3];
     bool isActive;
 };
 
@@ -45,6 +45,27 @@ float getSinusoidalValue(float x) {
     return (voxelGridSize / 2) * sin(x) + (voxelGridSize / 2);
 }
 
+float light(vec3 pos, vec3 normal){
+    vec3 lp = vec3(-5000.0,5000.0,-5000.0);
+    vec3 ld = lp - pos;
+    vec3 ln = normalize(ld);
+
+    return max(0.0,dot(normal,ln));
+}
+
+vec3 normal(vec3 hitPos, vec3 voxelCenter) {
+    vec3 normal = normalize(hitPos - voxelCenter);
+    // Clamp the normal to the closest axis
+    if (abs(normal.x) > abs(normal.y) && abs(normal.x) > abs(normal.z)) {
+        normal = vec3(sign(normal.x), 0.0, 0.0);
+    } else if (abs(normal.y) > abs(normal.x) && abs(normal.y) > abs(normal.z)) {
+        normal = vec3(0.0, sign(normal.y), 0.0);
+    } else {
+        normal = vec3(0.0, 0.0, sign(normal.z));
+    }
+    return normal;
+}
+
 void main() {
     vec2 uv = TexCoords * 2.0 - 1.0;
     uv.x *= aspectRatio;
@@ -67,8 +88,21 @@ void main() {
             if (indexX >= 0 && indexX < voxelGridSize && indexY >= 0 && indexY < voxelGridSize && indexZ >= 0 && indexZ < voxelGridSize) {
                 int index = indexX + indexY * voxelGridSize + indexZ * voxelGridSize * voxelGridSize;
                 if (voxels[index].isActive) {
-                    FragColor = vec4(voxels[index].color, 1.0);
-                    FragColor = vec4(float(voxelPos.x) / voxelGridSize, float(voxelPos.y) / voxelGridSize, float(voxelPos.z) / voxelGridSize, 1.0);
+
+                    vec3 hitPos = rayOrigin + rayDir * t;
+                    vec3 voxelCenter = voxelPos + vec3(0.5 * voxelSize);
+                    vec3 normal = normal(hitPos, voxelCenter);
+
+                    vec3 color = vec3(voxels[index].color[0],voxels[index].color[1],voxels[index].color[2]);
+
+                    color *= light(hitPos,normal);
+
+                    color += 0.1;
+
+                    color = pow(color,vec3(0.4545));
+
+                    FragColor = vec4(color, 1.0);
+                    //FragColor = vec4(normal + 0.1,1.0);
                     return;
                 }
             }
