@@ -46,9 +46,45 @@ float getSinusoidalValue(float x) {
 }
 
 float light(vec3 pos, vec3 normal){
-    vec3 lp = vec3(-5000.0,5000.0,-5000.0);
+    vec3 lp = vec3(cos(time) * -5000.0,2500.0,sin(time) * -5000.0);
     vec3 ld = lp - pos;
     vec3 ln = normalize(ld);
+
+    vec3 rayDir = ld;
+    vec3 rayOrigin = pos;
+
+    vec3 voxelPos = floor((rayOrigin / voxelSize) * voxelSize) + normal * 0.001;
+    vec3 step = sign(rayDir) * voxelSize;
+    vec3 tMax = ((voxelPos + step * 0.5 + step * 0.5 * sign(rayDir) - rayOrigin) / rayDir);
+    vec3 tDelta = abs(step / rayDir);
+
+    for (int i = 0; i < 256; i++) {
+        float t = intersectVoxel(rayOrigin, rayDir, voxelPos, voxelSize);
+        if (t > 0.0) {
+            int indexX = int(voxelPos.x / voxelSize);
+            int indexY = int(voxelPos.y / voxelSize);
+            int indexZ = int(voxelPos.z / voxelSize);
+
+            if (indexX >= 0 && indexX < voxelGridSize && indexY >= 0 && indexY < voxelGridSize && indexZ >= 0 && indexZ < voxelGridSize) {
+                int index = indexX + indexY * voxelGridSize + indexZ * voxelGridSize * voxelGridSize;
+                if (voxels[index].isActive) {
+                    return 0.0;
+                }
+            }
+        }
+
+        if (tMax.x < tMax.y && tMax.x < tMax.z) {
+            voxelPos.x += step.x;
+            tMax.x += tDelta.x;
+        } else if (tMax.y < tMax.z) {
+            voxelPos.y += step.y;
+            tMax.y += tDelta.y;
+        } else {
+            voxelPos.z += step.z;
+            tMax.z += tDelta.z;
+        }
+    }
+
 
     return max(0.0,dot(normal,ln));
 }
@@ -95,9 +131,7 @@ void main() {
 
                     vec3 color = vec3(voxels[index].color[0],voxels[index].color[1],voxels[index].color[2]);
 
-                    color *= light(hitPos,normal);
-
-                    color += 0.1;
+                    color *= light(hitPos,normal) + 0.2;
 
                     color = pow(color,vec3(0.4545));
 

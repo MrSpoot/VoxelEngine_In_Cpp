@@ -55,8 +55,8 @@ void initVoxels(std::vector<Voxel>& voxels) {
                     voxels[index].color[2] = static_cast<float>(rand()) / RAND_MAX;
 
                         //voxels[index].color = glm::vec3(0.95,0.48,0.06);
-                    voxels[index].isActive = (rand() % 50) == 0;
-                    //voxels[index].isActive = y == 1;
+                    voxels[index].isActive = (rand() % 10) == 0;
+                    //voxels[index].isActive = y == 1 || y == 8;
                     //voxels[index].isActive = true;
             }
         }
