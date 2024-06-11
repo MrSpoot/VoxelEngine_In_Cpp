@@ -4,6 +4,7 @@ out vec4 FragColor;
 in vec2 TexCoords;
 
 // Paramètres de la caméra
+uniform vec3 lightPos;
 uniform vec3 camPos;      // Position de la caméra
 uniform vec3 camDir;      // Direction de la caméra
 uniform vec3 camRight;    // Vecteur à droite de la caméra
@@ -25,7 +26,7 @@ layout(std430, binding = 0) buffer Voxels {
 // Position et taille de la grille de voxels
 const vec3 voxelGridMin = vec3(0.0, 0.0, 0.0);
 const float voxelSize = 1.0;
-const int voxelGridSize = 64;
+const int voxelGridSize = 256;
 
 float intersectVoxel(vec3 ro, vec3 rd, vec3 voxelPos, float voxelSize) {
     vec3 invDir = 1.0 / rd;
@@ -46,7 +47,9 @@ float getSinusoidalValue(float x) {
 }
 
 float light(vec3 pos, vec3 normal){
-    vec3 lp = vec3(cos(time) * -5000.0,2500.0,sin(time) * -5000.0);
+    vec3 lp = vec3(cos(time / 50.0) * 128.0,sin(time / 50.0) * 2500.0,128.0);
+    //vec3 lp = vec3(16.0,250.0,16.0);
+    //vec3 lp = lightPos;
     vec3 ld = lp - pos;
     vec3 ln = normalize(ld);
 
@@ -58,7 +61,7 @@ float light(vec3 pos, vec3 normal){
     vec3 tMax = ((voxelPos + step * 0.5 + step * 0.5 * sign(rayDir) - rayOrigin) / rayDir);
     vec3 tDelta = abs(step / rayDir);
 
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < 512; i++) {
         float t = intersectVoxel(rayOrigin, rayDir, voxelPos, voxelSize);
         if (t > 0.0) {
             int indexX = int(voxelPos.x / voxelSize);
@@ -84,8 +87,6 @@ float light(vec3 pos, vec3 normal){
             tMax.z += tDelta.z;
         }
     }
-
-
     return max(0.0,dot(normal,ln));
 }
 
@@ -114,7 +115,7 @@ void main() {
     vec3 tMax = ((voxelPos + step * 0.5 + step * 0.5 * sign(rayDir) - rayOrigin) / rayDir);
     vec3 tDelta = abs(step / rayDir);
 
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < 512; i++) {
         float t = intersectVoxel(rayOrigin, rayDir, voxelPos, voxelSize);
         if (t > 0.0) {
             int indexX = int(voxelPos.x / voxelSize);
@@ -131,7 +132,7 @@ void main() {
 
                     vec3 color = vec3(voxels[index].color[0],voxels[index].color[1],voxels[index].color[2]);
 
-                    color *= light(hitPos,normal) + 0.2;
+                    color *= light(hitPos,normal) + 0.1;
 
                     color = pow(color,vec3(0.4545));
 
