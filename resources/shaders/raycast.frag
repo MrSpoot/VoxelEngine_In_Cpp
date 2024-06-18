@@ -12,6 +12,7 @@ uniform vec3 camUp;       // Vecteur vers le haut de la caméra
 uniform float fov;        // Champ de vision (en radians)
 uniform float aspectRatio; // Rapport d'aspect de l'écran (width / height)
 uniform float time;
+uniform int voxelGridSize;
 
 struct Voxel {
     float color[3];
@@ -26,7 +27,6 @@ layout(std430, binding = 0) buffer Voxels {
 // Position et taille de la grille de voxels
 const vec3 voxelGridMin = vec3(0.0, 0.0, 0.0);
 const float voxelSize = 1.0;
-const int voxelGridSize = 256;
 
 float intersectVoxel(vec3 ro, vec3 rd, vec3 voxelPos, float voxelSize) {
     vec3 invDir = 1.0 / rd;
@@ -42,13 +42,9 @@ float intersectVoxel(vec3 ro, vec3 rd, vec3 voxelPos, float voxelSize) {
     return (tmax >= max(tmin, 0.0)) ? tmin : -1.0;
 }
 
-float getSinusoidalValue(float x) {
-    return (voxelGridSize / 2) * sin(x) + (voxelGridSize / 2);
-}
-
-float light(vec3 pos, vec3 normal){
-    vec3 lp = vec3(cos(time / 50.0) * 128.0,sin(time / 50.0) * 2500.0,128.0);
-    //vec3 lp = vec3(16.0,250.0,16.0);
+vec3 light(vec3 pos, vec3 normal){
+    vec3 lp = vec3(cos(time) * 512.0 + voxelGridSize / 2.0,512.0,sin(time) * 512.0+ voxelGridSize / 2.0);
+    //vec3 lp = vec3(voxelGridSize/2.0,voxelGridSize * 2.0,voxelGridSize/2.0);
     //vec3 lp = lightPos;
     vec3 ld = lp - pos;
     vec3 ln = normalize(ld);
@@ -57,11 +53,11 @@ float light(vec3 pos, vec3 normal){
     vec3 rayOrigin = pos;
 
     vec3 voxelPos = floor((rayOrigin / voxelSize) * voxelSize) + normal * 0.001;
-    vec3 step = sign(rayDir) * voxelSize;
+    vec3 step = sign(rayDir);
     vec3 tMax = ((voxelPos + step * 0.5 + step * 0.5 * sign(rayDir) - rayOrigin) / rayDir);
     vec3 tDelta = abs(step / rayDir);
 
-    for (int i = 0; i < 512; i++) {
+    for (int i = 0; i < 1024; i++) {
         float t = intersectVoxel(rayOrigin, rayDir, voxelPos, voxelSize);
         if (t > 0.0) {
             int indexX = int(voxelPos.x / voxelSize);
@@ -71,7 +67,7 @@ float light(vec3 pos, vec3 normal){
             if (indexX >= 0 && indexX < voxelGridSize && indexY >= 0 && indexY < voxelGridSize && indexZ >= 0 && indexZ < voxelGridSize) {
                 int index = indexX + indexY * voxelGridSize + indexZ * voxelGridSize * voxelGridSize;
                 if (voxels[index].isActive) {
-                    return 0.0;
+                    return vec3(0.0);
                 }
             }
         }
@@ -87,7 +83,8 @@ float light(vec3 pos, vec3 normal){
             tMax.z += tDelta.z;
         }
     }
-    return max(0.0,dot(normal,ln));
+    //return max(vec3(0.0),dot(normal,ln));
+    return max(vec3(0.0),dot(normal,ln));
 }
 
 vec3 normal(vec3 hitPos, vec3 voxelCenter) {
@@ -111,11 +108,11 @@ void main() {
     vec3 rayOrigin = camPos;
 
     vec3 voxelPos = floor((rayOrigin / voxelSize) * voxelSize);
-    vec3 step = sign(rayDir) * voxelSize;
+    vec3 step = sign(rayDir);
     vec3 tMax = ((voxelPos + step * 0.5 + step * 0.5 * sign(rayDir) - rayOrigin) / rayDir);
     vec3 tDelta = abs(step / rayDir);
 
-    for (int i = 0; i < 512; i++) {
+    for (int i = 0; i < 1024; i++) {
         float t = intersectVoxel(rayOrigin, rayDir, voxelPos, voxelSize);
         if (t > 0.0) {
             int indexX = int(voxelPos.x / voxelSize);
@@ -135,6 +132,8 @@ void main() {
                     color *= light(hitPos,normal) + 0.1;
 
                     color = pow(color,vec3(0.4545));
+
+                    //color = light(hitPos,normal) + 0.1;
 
                     FragColor = vec4(color, 1.0);
                     //FragColor = vec4(normal + 0.1,1.0);
