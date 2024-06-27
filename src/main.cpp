@@ -42,22 +42,30 @@ bool wireframeMode = false;
 float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
-const int VOXEL_GRID_SIZE = 512;
+const int VOXEL_GRID_SIZE = 64;
 
 void initVoxels(std::vector<Voxel>& voxels) {
     for (int x = 0; x < VOXEL_GRID_SIZE; ++x) {
         for (int y = 0; y < VOXEL_GRID_SIZE; ++y) {
             for (int z = 0; z < VOXEL_GRID_SIZE; ++z) {
 
-                    float zoom = 50.0;
+                int index = x + y * VOXEL_GRID_SIZE + z * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE;
+                voxels[index].color[0] = static_cast<float>(rand()) / RAND_MAX;
+                voxels[index].color[1] = static_cast<float>(rand()) / RAND_MAX;
+                voxels[index].color[2] = static_cast<float>(rand()) / RAND_MAX;
 
-                    int index = x + y * VOXEL_GRID_SIZE + z * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE;
-                    voxels[index].color[0] = static_cast<float>(rand()) / RAND_MAX;
-                    voxels[index].color[1] = static_cast<float>(rand()) / RAND_MAX;
-                    voxels[index].color[2] = static_cast<float>(rand()) / RAND_MAX;
+                voxels[index].isActive = (x % 4 == 0 && y == 8 && z % 4 == 0) || y == 2;
 
-
-                    voxels[index].isActive = ((sin(x/zoom) + 1.0) / 2.0) * (VOXEL_GRID_SIZE / 2) > y && ((cos(z/zoom) + 1.0) / 2.0) * (VOXEL_GRID_SIZE / 2) > y;
+                //voxels[index].isActive = false;
+//                    float zoom = 100.0;
+//
+//                    int index = x + y * VOXEL_GRID_SIZE + z * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE;
+//                    voxels[index].color[0] = static_cast<float>(rand()) / RAND_MAX;
+//                    voxels[index].color[1] = static_cast<float>(rand()) / RAND_MAX;
+//                    voxels[index].color[2] = static_cast<float>(rand()) / RAND_MAX;
+//
+//
+//                    voxels[index].isActive = ((sin(x/zoom) + 1.0) / 2.0) * (VOXEL_GRID_SIZE / 2) > y && ((cos(z/zoom) + 1.0) / 2.0) * (VOXEL_GRID_SIZE / 2) > y;
 
                     //voxels[index].color = glm::vec3(0.95,0.48,0.06);
                     //voxels[index].isActive = (rand() % 50) == 0;
@@ -174,7 +182,7 @@ int main() {
     initVoxels(voxels);
     GLuint ssbo = createSSBO(voxels);
 
-    Shader shader("../resources/shaders/raycast.vert","../resources/shaders/raycast.frag");
+    Shader shader("../resources/shaders/raycast.vert","../resources/shaders/octree.frag");
 
     shader.use();
 
