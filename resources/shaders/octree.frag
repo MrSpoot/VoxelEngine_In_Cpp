@@ -15,9 +15,9 @@ uniform int voxelGridSize;
 
 // Déclarer les constantes
 const float MAX_DISTANCE = 250.0;
-const int MAX_DETAIL = -1;
-const int MIN_DETAIL = -2;
-const float SCALE = 8.0;
+const int MAX_DETAIL = 2;
+const int MIN_DETAIL = -1;
+const float SCALE = 10.0;
 const int POWER = int(log2(SCALE));
 
 // Fonction pour générer un nombre aléatoire basé sur une position et une taille

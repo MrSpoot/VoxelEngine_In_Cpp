@@ -230,7 +230,7 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::SetNextWindowSize(ImVec2(325, 175));
+        ImGui::SetNextWindowSize(ImVec2(325, 200));
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.3);
         // Begin window with no title bar, no resize, no move, no scrollbar, no collapse, no nav, no background
@@ -252,6 +252,7 @@ int main() {
         ImGui::Text("Max FPS: %.1f", maxFps);
         //ImGui::InputFloat3("Light Pos",&lightPos[0]);
         ImGui::DragFloat3("Light Pos",&lightPos[0]);
+        ImGui::DragFloat("Camera Speed",&camera.MovementSpeed);
         ImGui::End();
 
         // Set wireframe mode
@@ -344,7 +345,7 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
-    camera.setSpeed(camera.MovementSpeed + (yoffset * 0.25));
+    camera.setSpeed(camera.MovementSpeed + (yoffset * 0.0025));
     //camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
