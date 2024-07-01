@@ -10,11 +10,14 @@
 #include "utils/Camera.h"
 #include "utils/Shader.h"
 #include "utils/OctreeNode.h"
+#include "utils/Voxel.h"
+#include "utils/SVONode.h"
 
 #include <iostream>
 #include <vector>
 #include <numeric>
 #include <algorithm>
+#include <memory>
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 
@@ -44,45 +47,11 @@ float lastFrame = 0.0f;
 
 const int VOXEL_GRID_SIZE = 64;
 
-void initVoxels(std::vector<Voxel>& voxels) {
-    for (int x = 0; x < VOXEL_GRID_SIZE; ++x) {
-        for (int y = 0; y < VOXEL_GRID_SIZE; ++y) {
-            for (int z = 0; z < VOXEL_GRID_SIZE; ++z) {
-
-                int index = x + y * VOXEL_GRID_SIZE + z * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE;
-                voxels[index].color[0] = static_cast<float>(rand()) / RAND_MAX;
-                voxels[index].color[1] = static_cast<float>(rand()) / RAND_MAX;
-                voxels[index].color[2] = static_cast<float>(rand()) / RAND_MAX;
-
-                voxels[index].isActive = (x % 4 == 0 && y == 8 && z % 4 == 0) || y == 2;
-
-                //voxels[index].isActive = false;
-//                    float zoom = 100.0;
-//
-//                    int index = x + y * VOXEL_GRID_SIZE + z * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE;
-//                    voxels[index].color[0] = static_cast<float>(rand()) / RAND_MAX;
-//                    voxels[index].color[1] = static_cast<float>(rand()) / RAND_MAX;
-//                    voxels[index].color[2] = static_cast<float>(rand()) / RAND_MAX;
-//
-//
-//                    voxels[index].isActive = ((sin(x/zoom) + 1.0) / 2.0) * (VOXEL_GRID_SIZE / 2) > y && ((cos(z/zoom) + 1.0) / 2.0) * (VOXEL_GRID_SIZE / 2) > y;
-
-                    //voxels[index].color = glm::vec3(0.95,0.48,0.06);
-                    //voxels[index].isActive = (rand() % 50) == 0;
-                    //voxels[index].isActive = y == 1 || y == 8;
-                    //voxels[index].isActive = noiseValue > 0.5;
-                    //voxels[index].isActive = true;
-                    //voxels[index].isActive = x % spacing == 0 && y % spacing == 0 && z % spacing == 0;
-            }
-        }
-    }
-}
-
-GLuint createSSBO(const std::vector<Voxel>& voxels) {
+GLuint createSSBO(const std::vector<GPUOctreeNode> nodes) {
     GLuint ssbo;
     glGenBuffers(1, &ssbo);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, voxels.size() * sizeof(Voxel), voxels.data(), GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, nodes.size() * sizeof(GPUOctreeNode), nodes.data(), GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo); // Lier le SSBO à l'index 0
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     return ssbo;
@@ -177,10 +146,27 @@ int main() {
     // Unbind VAO
     glBindVertexArray(0);
 
-    std::vector<Voxel> voxels;
-    voxels.resize(VOXEL_GRID_SIZE * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE);
-    initVoxels(voxels);
-    GLuint ssbo = createSSBO(voxels);
+// Initialiser les voxels dans le monde
+    std::vector<Voxel> voxels = {
+            Voxel(1.0f, 0.0f, 0.0f, glm::vec3(1.0f, 0.0f, 0.0f)), // Rouge
+            Voxel(2.0f, 0.0f, 0.0f, glm::vec3(0.0f, 1.0f, 0.0f))  // Vert
+    };
+
+    // Créer la racine de l'Octree
+    auto svoRoot = std::make_unique<SVONode>(0.0f, 0.0f, 0.0f, 8.0f);
+
+    // Insérer les voxels dans l'Octree
+    for (const auto& voxel : voxels) {
+        svoRoot->insert(voxel);
+    }
+
+    // Sérialiser l'Octree pour l'envoyer au GPU
+    std::vector<GPUOctreeNode> nodes;
+    int index = 0;
+    svoRoot->serialize(nodes, index);
+
+    // Créer le SSBO et envoyer les données au GPU
+    GLuint ssbo = createSSBO(nodes);
 
     Shader shader("../resources/shaders/raycast.vert","../resources/shaders/octree.frag");
 
