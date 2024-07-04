@@ -58,7 +58,7 @@ vec3 light(vec3 pos, vec3 normal){
     vec3 tDelta = abs(step / rayDir);
 
     for (int i = 0; i < 1024; i++) {
-        float t = intersectVoxel(rayOrigin, rayDir, voxelPos, voxelSize);
+        float t = intersectVoxel(rayOrigin, rayDir, z, voxelSize);
         if (t > 0.0) {
             int indexX = int(voxelPos.x / voxelSize);
             int indexY = int(voxelPos.y / voxelSize);

@@ -59,19 +59,24 @@ bool traverseOctree(vec3 ro, vec3 rd, int nodeIndex, out vec3 hitPos, out vec3 n
         nodeIndex = stack[--stackPtr];
         while (nodeIndex >= 0) {
             GPUOctreeNode node = nodes[nodeIndex];
+
             if (node.isActive == 0) {
                 nodeIndex = -1;
                 continue;
             }
 
-            float t = intersectVoxel(ro, rd, node.center - node.size * 0.5, node.size);
+            float t = intersectVoxel(ro, rd, node.center - node.size, node.size);
             if (t > 0.0) {
                 if (node.isLeaf == 1) {
-                    hitPos = ro + t * rd;
-                    vec3 voxelCenter = node.center;
-                    normal = computeNormal(hitPos, voxelCenter);
-                    color = node.color;
-                    return true;
+                    if (node.isActive == 1) {
+                        hitPos = ro + t * rd;
+                        vec3 voxelCenter = node.center;
+                        normal = computeNormal(hitPos, voxelCenter);
+                        color = node.color;
+                        return true;
+                    } else {
+                        color = vec3(1.0, 1.0, 0.0); // Jaune pour les feuilles inactives
+                    }
                 } else {
                     for (int i = 0; i < 8; ++i) {
                         int childIndex = node.children[i];
@@ -80,12 +85,15 @@ bool traverseOctree(vec3 ro, vec3 rd, int nodeIndex, out vec3 hitPos, out vec3 n
                         }
                     }
                 }
+            } else {
+                color = vec3(node.size); // Orange si pas d'intersection
             }
             nodeIndex = -1;
         }
     }
     return false;
 }
+
 
 void main() {
     vec2 uv = TexCoords * 2.0 - 1.0;
@@ -100,6 +108,6 @@ void main() {
         color = pow(color, vec3(0.4545)); // Apply gamma correction
         FragColor = vec4(color, 1.0);
     } else {
-        FragColor = vec4(0.2, 0.2, 0.2, 1.0);
+        FragColor = vec4(color, 1.0); // Afficher la couleur de débogage
     }
 }

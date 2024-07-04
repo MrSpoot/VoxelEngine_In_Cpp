@@ -9,11 +9,12 @@
 #include <glm/glm.hpp>
 
 struct Voxel {
-    float x, y, z;
+    glm::vec3 position;
     glm::vec3 color;
     bool isActive;
-    Voxel(float x, float y, float z, glm::vec3 color, bool isActive = true)
-            : x(x), y(y), z(z), color(color), isActive(isActive) {}
+
+    Voxel(const glm::vec3& position, const glm::vec3& color, bool isActive = true)
+            : position(position), color(color), isActive(isActive) {}
 };
 
 

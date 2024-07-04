@@ -9,9 +9,8 @@
 #include "imgui_impl_opengl3.h"
 #include "utils/Camera.h"
 #include "utils/Shader.h"
-#include "utils/OctreeNode.h"
 #include "utils/Voxel.h"
-#include "utils/SVONode.h"
+#include "utils/octree.h"
 
 #include <iostream>
 #include <vector>
@@ -47,13 +46,14 @@ float lastFrame = 0.0f;
 
 const int VOXEL_GRID_SIZE = 64;
 
-GLuint createSSBO(const std::vector<GPUOctreeNode> nodes) {
+GLuint createSSBO(const std::vector<GPUOctreeNode>& data) {
     GLuint ssbo;
     glGenBuffers(1, &ssbo);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, nodes.size() * sizeof(GPUOctreeNode), nodes.data(), GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo); // Lier le SSBO à l'index 0
+    glBufferData(GL_SHADER_STORAGE_BUFFER, data.size() * sizeof(GPUOctreeNode), data.data(), GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    std::cout << "SSBO created with size " << data.size() * sizeof(GPUOctreeNode) << " bytes\n";
     return ssbo;
 }
 
@@ -82,7 +82,7 @@ int main() {
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
-    glfwSwapInterval(0);
+    glfwSwapInterval(1);
 
     // Glad: load all OpenGL function pointers
     // ---------------------------------------
@@ -146,29 +146,24 @@ int main() {
     // Unbind VAO
     glBindVertexArray(0);
 
-// Initialiser les voxels dans le monde
-    std::vector<Voxel> voxels = {
-            Voxel(1.0f, 0.0f, 0.0f, glm::vec3(1.0f, 0.0f, 0.0f)), // Rouge
-            Voxel(2.0f, 0.0f, 0.0f, glm::vec3(0.0f, 1.0f, 0.0f))  // Vert
-    };
+    Octree tree(glm::vec3(1), glm::vec3(1));
 
-    // Créer la racine de l'Octree
-    auto svoRoot = std::make_unique<SVONode>(0.0f, 0.0f, 0.0f, 8.0f);
+    // Exemple d'insertion de voxels dans l'Octree
+    tree.insert(Voxel(glm::vec3(0.5, 0.5, 0.5), glm::vec3(1.0, 0.0, 0.0), true));
+    tree.insert(Voxel(glm::vec3(-0.5, -0.5, -0.5), glm::vec3(0.0, 1.0, 0.0), true));
+    tree.insert(Voxel(glm::vec3(0.25, 0.25, 0.25), glm::vec3(0.0, 0.0, 1.0), true));
+    tree.insert(Voxel(glm::vec3(-0.25, -0.25, -0.25), glm::vec3(1.0, 1.0, 0.0), true));
 
-    // Insérer les voxels dans l'Octree
-    for (const auto& voxel : voxels) {
-        svoRoot->insert(voxel);
-    }
+    std::cout << "Voxels inserted into the Octree.\n";
 
-    // Sérialiser l'Octree pour l'envoyer au GPU
-    std::vector<GPUOctreeNode> nodes;
-    int index = 0;
-    svoRoot->serialize(nodes, index);
+    // Sérialiser l'Octree
+    std::vector<GPUOctreeNode> octreeData;
+    tree.serialize(octreeData);
 
-    // Créer le SSBO et envoyer les données au GPU
-    GLuint ssbo = createSSBO(nodes);
+    // Créez un SSBO et envoyez les données au GPU
+    GLuint ssbo = createSSBO(octreeData);
 
-    Shader shader("../resources/shaders/raycast.vert","../resources/shaders/octree.frag");
+    Shader shader("../resources/shaders/raycast.vert","../resources/shaders/octree-debug.frag");
 
     shader.use();
 
@@ -200,6 +195,16 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         shader.use();
+
+        glm::vec3 camPos(0.0f, 0.0f, 5.0f); // Position de la caméra
+        glm::vec3 camDir(0.0f, 0.0f, -1.0f); // Direction de la caméra
+        glm::vec3 camRight(1.0f, 0.0f, 0.0f); // Vecteur à droite de la caméra
+        glm::vec3 camUp(0.0f, 1.0f, 0.0f); // Vecteur vers le haut de la caméra
+
+//        shader.setVec3("camPos", camPos);
+//        shader.setVec3("camDir", camDir);
+//        shader.setVec3("camRight", camRight);
+//        shader.setVec3("camUp", camUp);
 
         shader.setVec3("camPos", camera.Position);
         shader.setVec3("camDir", camera.Front);
