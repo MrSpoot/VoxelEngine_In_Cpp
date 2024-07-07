@@ -23,18 +23,18 @@ int Octree::getOctantContainingPoint(const glm::vec3& point) const {
     return oct;
 }
 
-void Octree::insert(const Voxel& voxel) {
-    // If this node doesn't have a voxel yet, simply store it here
-    if (this->voxel == nullptr) {
+void Octree::insert(const Voxel& voxel, float voxelSize) {
+    // Si ce noeud ne contient pas de voxel et que sa taille est adaptée, insérez-le ici
+    if (this->voxel == nullptr && halfDimension.x * 2.0f <= voxelSize) {
         this->voxel = new Voxel(voxel);
         return;
     }
 
-    // Otherwise, we need to subdivide the node
-    // Create children
+    // Sinon, nous devons subdiviser le noeud
+    // Créer les enfants si ce noeud est une feuille
     if (isLeafNode()) {
         for (int i = 0; i < 8; ++i) {
-            // Compute new bounding box for this child
+            // Calculer la nouvelle origine pour cet enfant
             glm::vec3 newOrigin = origin;
             newOrigin.x += halfDimension.x * (i & 4 ? 0.5f : -0.5f);
             newOrigin.y += halfDimension.y * (i & 2 ? 0.5f : -0.5f);
@@ -43,17 +43,17 @@ void Octree::insert(const Voxel& voxel) {
         }
     }
 
-    // Reinsert the old voxel into the appropriate child
-    int octant = getOctantContainingPoint(this->voxel->position);
-    children[octant]->insert(*(this->voxel));
+    // Réinsérer l'ancien voxel dans l'enfant approprié
+    if (this->voxel != nullptr) {
+        int octant = getOctantContainingPoint(this->voxel->position);
+        children[octant]->insert(*(this->voxel), voxelSize);
+        delete this->voxel;  // Supprimer l'ancien voxel du noeud actuel
+        this->voxel = nullptr;
+    }
 
-    // Insert the new voxel into the appropriate child
-    octant = getOctantContainingPoint(voxel.position);
-    children[octant]->insert(voxel);
-
-    // Clear the voxel from this node
-    delete this->voxel;
-    this->voxel = nullptr;
+    // Insérer le nouveau voxel dans l'enfant approprié
+    int octant = getOctantContainingPoint(voxel.position);
+    children[octant]->insert(voxel, voxelSize);
 }
 
 void Octree::serialize(std::vector<GPUOctreeNode>& data) const {
@@ -64,27 +64,18 @@ void Octree::serializeNode(const Octree* node, std::vector<GPUOctreeNode>& data)
     if (node == nullptr) return;
 
     GPUOctreeNode gpuNode;
-    gpuNode.center[0] = origin.x;
-    gpuNode.center[1] = origin.y;
-    gpuNode.center[2] = origin.z;
+    gpuNode.center = origin;
     gpuNode.size = node->halfDimension.x * 2.0f;
-    gpuNode.isLeaf = node->isLeafNode() ? 1 : 0;
-    gpuNode.isActive = node->voxel != nullptr ? 1 : 0;
-
-    if(node->voxel){
-        gpuNode.color[0] = node->voxel->color.r;
-        gpuNode.color[1] = node->voxel->color.g;
-        gpuNode.color[2] = node->voxel->color.b;
-    }else{
-        gpuNode.color[0] = 0.0f;
-        gpuNode.color[1] = 0.0f;
-        gpuNode.color[2] = 0.0f;
-    }
+//    gpuNode.isLeaf = node->isLeafNode() ? 1 : 0;
+//    gpuNode.isActive = node->voxel != nullptr ? 1 : 0;
+    gpuNode.isActive = 1;
+    gpuNode.isLeaf = 1;
+    gpuNode.color = node->voxel ? node->voxel->color : glm::vec3(1);
 
     std::cout << "Serializing node at (" << node->origin.x << ", " << node->origin.y << ", " << node->origin.z
               << ") with size " << gpuNode.size << ", isLeaf: " << gpuNode.isLeaf
               << ", isActive: " << gpuNode.isActive
-              << ", color: (" << gpuNode.color[0] << ", " << gpuNode.color[1] << ", " << gpuNode.color[2] << ")\n";
+              << ", color: (" << gpuNode.color.r << ", " << gpuNode.color.g << ", " << gpuNode.color.b << ")\n";
 
     int startIndex = data.size();
     data.push_back(gpuNode);

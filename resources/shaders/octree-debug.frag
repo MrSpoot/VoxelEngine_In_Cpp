@@ -50,14 +50,55 @@ vec3 computeNormal(vec3 hitPos, vec3 voxelCenter) {
     return normal;
 }
 
+//bool traverseOctree(vec3 ro, vec3 rd, int nodeIndex, out vec3 hitPos, out vec3 normal, out vec3 color){
+//
+//    int stack[64];
+//    int top = -1;
+//
+//    stack[top++] = nodeIndex;
+//
+//    while(top >= 0){
+//        int currentIndex = stack[top];
+//        if (currentIndex == -1) continue;
+//
+//        GPUOctreeNode node = nodes[currentIndex];
+//
+//        if(node.isActive == 0)
+//
+//        float t = intersectVoxel(ro, rd, node.center - node.size * 0.5, node.size);
+//
+//        if (t > 0.0) {
+//            if (node.isLeaf == 1) {
+//                hitPos = ro + t * rd;
+//                vec3 voxelCenter = node.center;
+//                normal = computeNormal(hitPos, voxelCenter);
+//                color = node.color;
+//                color = vec3(1, 1, 0);
+//                return true;
+//            } else {
+//                for (int i = 0; i < 8; ++i) {
+//                    int childIndex = node.children[i];
+//                    if (childIndex >= 0) {
+//                        stack[stackPtr++] = childIndex;
+//                    }
+//                }
+//            }
+//        }
+//    }
+//
+//}
+
 bool traverseOctree(vec3 ro, vec3 rd, int nodeIndex, out vec3 hitPos, out vec3 normal, out vec3 color) {
     int stack[64];
     int stackPtr = 0;
     stack[stackPtr++] = nodeIndex;
 
-    while (stackPtr > 0) {
+    int y = 0;
+
+    while (s-tackPtr > 0) {
         nodeIndex = stack[--stackPtr];
         while (nodeIndex >= 0) {
+            y++;
             GPUOctreeNode node = nodes[nodeIndex];
 
             if (node.isActive == 0) {
@@ -65,18 +106,16 @@ bool traverseOctree(vec3 ro, vec3 rd, int nodeIndex, out vec3 hitPos, out vec3 n
                 continue;
             }
 
-            float t = intersectVoxel(ro, rd, node.center - node.size, node.size);
+            float t = intersectVoxel(ro, rd, node.center - node.size * 0.5, node.size);
+
             if (t > 0.0) {
                 if (node.isLeaf == 1) {
-                    if (node.isActive == 1) {
-                        hitPos = ro + t * rd;
-                        vec3 voxelCenter = node.center;
-                        normal = computeNormal(hitPos, voxelCenter);
-                        color = node.color;
-                        return true;
-                    } else {
-                        color = vec3(1.0, 1.0, 0.0); // Jaune pour les feuilles inactives
-                    }
+                    hitPos = ro + t * rd;
+                    vec3 voxelCenter = node.center;
+                    normal = computeNormal(hitPos, voxelCenter);
+                    color = node.color;
+                    color = vec3(1,1,0);
+                    return true;
                 } else {
                     for (int i = 0; i < 8; ++i) {
                         int childIndex = node.children[i];
@@ -85,12 +124,21 @@ bool traverseOctree(vec3 ro, vec3 rd, int nodeIndex, out vec3 hitPos, out vec3 n
                         }
                     }
                 }
-            } else {
-                color = vec3(node.size); // Orange si pas d'intersection
             }
             nodeIndex = -1;
         }
     }
+
+    if(y == 1){
+        color = vec3(0,1,0);
+    }else if(y == 2){
+        color = vec3(0,0,1);
+    }else if (y > 1){
+        color = vec3(1,0,0);
+    }else{
+        color = vec3(1,0,1);
+    }
+
     return false;
 }
 
@@ -105,9 +153,10 @@ void main() {
     vec3 hitPos, normal, color;
 
     if (traverseOctree(rayOrigin, rayDir, 0, hitPos, normal, color)) {
-        color = pow(color, vec3(0.4545)); // Apply gamma correction
+        color = pow(color, vec3(0.4545));// Apply gamma correction
         FragColor = vec4(color, 1.0);
     } else {
-        FragColor = vec4(color, 1.0); // Afficher la couleur de débogage
+        FragColor = vec4(color, 1.0);// Afficher la couleur de débogage
+        //FragColor = vec4(0,0,1,1);
     }
 }

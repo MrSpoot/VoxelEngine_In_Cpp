@@ -146,13 +146,14 @@ int main() {
     // Unbind VAO
     glBindVertexArray(0);
 
-    Octree tree(glm::vec3(1), glm::vec3(1));
+    Octree tree(glm::vec3(0), glm::vec3(1.0f));
 
-    // Exemple d'insertion de voxels dans l'Octree
-    tree.insert(Voxel(glm::vec3(0.5, 0.5, 0.5), glm::vec3(1.0, 0.0, 0.0), true));
-    tree.insert(Voxel(glm::vec3(-0.5, -0.5, -0.5), glm::vec3(0.0, 1.0, 0.0), true));
-    tree.insert(Voxel(glm::vec3(0.25, 0.25, 0.25), glm::vec3(0.0, 0.0, 1.0), true));
-    tree.insert(Voxel(glm::vec3(-0.25, -0.25, -0.25), glm::vec3(1.0, 1.0, 0.0), true));
+    float voxelsize = 0.25f;
+
+    tree.insert(Voxel(glm::vec3(0.5, 0.5, 0.5), glm::vec3(1.0, 0.0, 0.0), true),voxelsize);
+//    tree.insert(Voxel(glm::vec3(-0.5, -0.5, -0.5), glm::vec3(0.0, 1.0, 0.0), true),voxelsize);
+//    tree.insert(Voxel(glm::vec3(0.25, 0.25, 0.25), glm::vec3(0.0, 0.0, 1.0), true),voxelsize);
+//    tree.insert(Voxel(glm::vec3(-0.25, -0.25, -0.25), glm::vec3(1.0, 1.0, 0.0), true),voxelsize);
 
     std::cout << "Voxels inserted into the Octree.\n";
 

@@ -6,11 +6,11 @@
 #include "Voxel.h"
 
 struct GPUOctreeNode {
-    float center[3];
+    glm::vec3 center;
     float size;
     int children[8];
     int isLeaf;
-    float color[3];
+    glm::vec3 color;
     int isActive;
 };
 
@@ -19,7 +19,7 @@ public:
     Octree(const glm::vec3& origin, const glm::vec3& halfDimension);
     ~Octree();
 
-    void insert(const Voxel& voxel);
+    void insert(const Voxel& voxel, float voxelSize);
     bool isLeafNode() const;
     void serialize(std::vector<GPUOctreeNode>& data) const;
     void serializeNode(const Octree* node, std::vector<GPUOctreeNode>& data) const;
