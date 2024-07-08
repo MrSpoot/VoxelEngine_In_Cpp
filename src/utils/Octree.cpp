@@ -60,34 +60,52 @@ void Octree::serialize(std::vector<GPUOctreeNode>& data) const {
     serializeNode(this, data);
 }
 
-void Octree::serializeNode(const Octree* node, std::vector<GPUOctreeNode>& data) const {
-    if (node == nullptr) return;
+bool Octree::serializeNode(const Octree* node, std::vector<GPUOctreeNode>& data) const {
+    if (node == nullptr) return false;
 
     GPUOctreeNode gpuNode;
-    gpuNode.center = origin;
+    gpuNode.center[0] = node->origin.x;
+    gpuNode.center[1] = node->origin.y;
+    gpuNode.center[2] = node->origin.z;
     gpuNode.size = node->halfDimension.x * 2.0f;
-//    gpuNode.isLeaf = node->isLeafNode() ? 1 : 0;
-//    gpuNode.isActive = node->voxel != nullptr ? 1 : 0;
-    gpuNode.isActive = 1;
-    gpuNode.isLeaf = 1;
-    gpuNode.color = node->voxel ? node->voxel->color : glm::vec3(1);
+    gpuNode.isLeaf = node->isLeafNode() ? 1 : 0;
+    gpuNode.isActive = node->voxel != nullptr ? 1 : 0;
 
-    std::cout << "Serializing node at (" << node->origin.x << ", " << node->origin.y << ", " << node->origin.z
-              << ") with size " << gpuNode.size << ", isLeaf: " << gpuNode.isLeaf
-              << ", isActive: " << gpuNode.isActive
-              << ", color: (" << gpuNode.color.r << ", " << gpuNode.color.g << ", " << gpuNode.color.b << ")\n";
+    if (node->voxel) {
+        gpuNode.color[0] = node->voxel->color.r;
+        gpuNode.color[1] = node->voxel->color.g;
+        gpuNode.color[2] = node->voxel->color.b;
+    } else {
+        gpuNode.color[0] = 0.0f;
+        gpuNode.color[1] = 0.0f;
+        gpuNode.color[2] = 0.0f;
+    }
 
     int startIndex = data.size();
     data.push_back(gpuNode);
+    bool hasActiveChildren = false;
 
     for (int i = 0; i < 8; ++i) {
         if (node->children[i]) {
             gpuNode.children[i] = data.size();
-            serializeNode(node->children[i], data);
+            if (serializeNode(node->children[i], data)) {
+                hasActiveChildren = true;
+            }
         } else {
             gpuNode.children[i] = -1;
         }
     }
 
-    data[startIndex] = gpuNode; // Mettre à jour le nœud parent avec les indices des enfants
+    if (hasActiveChildren) {
+        gpuNode.isActive = 1;
+    }
+
+    std::cout << "Serializing node at (" << node->origin.x << ", " << node->origin.y << ", " << node->origin.z
+              << ") with size " << gpuNode.size << ", isLeaf: " << gpuNode.isLeaf
+              << ", isActive: " << gpuNode.isActive
+              << ", color: (" << gpuNode.color[0] << ", " << gpuNode.color[1] << ", " << gpuNode.color[2] << ")\n";
+
+    data[startIndex] = gpuNode;
+
+    return gpuNode.isActive > 0;
 }

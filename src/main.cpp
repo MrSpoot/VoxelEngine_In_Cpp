@@ -57,6 +57,23 @@ GLuint createSSBO(const std::vector<GPUOctreeNode>& data) {
     return ssbo;
 }
 
+void printOctreeData(const std::vector<GPUOctreeNode>& nodes) {
+    for (int y = 0; y < nodes.size(); ++y) {
+        GPUOctreeNode node = nodes[y];
+        std::cout << "Index : " << y << "\n";
+        std::cout << "Center: (" << node.center.x << ", " << node.center.y << ", " << node.center.z << ")\n";
+        std::cout << "Size: " << node.size << "\n";
+        std::cout << "Children: ";
+        for (int i = 0; i < 8; ++i) {
+            std::cout << node.children[i] << " ";
+        }
+        std::cout << "\n";
+        std::cout << "Is Leaf: " << node.isLeaf << "\n";
+        std::cout << "Color: (" << node.color.x << ", " << node.color.y << ", " << node.color.z << ")\n";
+        std::cout << "Is Active: " << node.isActive << "\n\n";
+    }
+}
+
 
 int main() {
     // glfw: initialize and configure
@@ -146,20 +163,19 @@ int main() {
     // Unbind VAO
     glBindVertexArray(0);
 
-    Octree tree(glm::vec3(0), glm::vec3(1.0f));
+    Octree tree(glm::vec3(0), glm::vec3(1));
 
-    float voxelsize = 0.25f;
+    float voxelsize = 1.0f;
 
-    tree.insert(Voxel(glm::vec3(0.5, 0.5, 0.5), glm::vec3(1.0, 0.0, 0.0), true),voxelsize);
-//    tree.insert(Voxel(glm::vec3(-0.5, -0.5, -0.5), glm::vec3(0.0, 1.0, 0.0), true),voxelsize);
-//    tree.insert(Voxel(glm::vec3(0.25, 0.25, 0.25), glm::vec3(0.0, 0.0, 1.0), true),voxelsize);
-//    tree.insert(Voxel(glm::vec3(-0.25, -0.25, -0.25), glm::vec3(1.0, 1.0, 0.0), true),voxelsize);
+    tree.insert(Voxel(glm::vec3(0.0), glm::vec3(1.0, 0.0, 1.0), true),voxelsize);
 
     std::cout << "Voxels inserted into the Octree.\n";
 
     // Sérialiser l'Octree
     std::vector<GPUOctreeNode> octreeData;
     tree.serialize(octreeData);
+
+    printOctreeData(octreeData);
 
     // Créez un SSBO et envoyez les données au GPU
     GLuint ssbo = createSSBO(octreeData);
@@ -222,7 +238,7 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::SetNextWindowSize(ImVec2(325, 200));
+        ImGui::SetNextWindowSize(ImVec2(325, 225));
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.3);
         // Begin window with no title bar, no resize, no move, no scrollbar, no collapse, no nav, no background
@@ -242,6 +258,7 @@ int main() {
 
         ImGui::Text("Average FPS: %.1f", averageFPS);
         ImGui::Text("Max FPS: %.1f", maxFps);
+        ImGui::Text("Camera (%.1f,%.1f,%.1f)", camera.Position.x,camera.Position.y,camera.Position.z);
         //ImGui::InputFloat3("Light Pos",&lightPos[0]);
         ImGui::DragFloat3("Light Pos",&lightPos[0]);
         ImGui::DragFloat("Camera Speed",&camera.MovementSpeed);

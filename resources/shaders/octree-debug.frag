@@ -3,7 +3,7 @@
 out vec4 FragColor;
 in vec2 TexCoords;
 
-// Paramètres de la caméra
+// Camera parameters
 uniform vec3 camPos;
 uniform vec3 camDir;
 uniform vec3 camRight;
@@ -50,98 +50,43 @@ vec3 computeNormal(vec3 hitPos, vec3 voxelCenter) {
     return normal;
 }
 
-//bool traverseOctree(vec3 ro, vec3 rd, int nodeIndex, out vec3 hitPos, out vec3 normal, out vec3 color){
-//
-//    int stack[64];
-//    int top = -1;
-//
-//    stack[top++] = nodeIndex;
-//
-//    while(top >= 0){
-//        int currentIndex = stack[top];
-//        if (currentIndex == -1) continue;
-//
-//        GPUOctreeNode node = nodes[currentIndex];
-//
-//        if(node.isActive == 0)
-//
-//        float t = intersectVoxel(ro, rd, node.center - node.size * 0.5, node.size);
-//
-//        if (t > 0.0) {
-//            if (node.isLeaf == 1) {
-//                hitPos = ro + t * rd;
-//                vec3 voxelCenter = node.center;
-//                normal = computeNormal(hitPos, voxelCenter);
-//                color = node.color;
-//                color = vec3(1, 1, 0);
-//                return true;
-//            } else {
-//                for (int i = 0; i < 8; ++i) {
-//                    int childIndex = node.children[i];
-//                    if (childIndex >= 0) {
-//                        stack[stackPtr++] = childIndex;
-//                    }
-//                }
-//            }
-//        }
-//    }
-//
-//}
-
-bool traverseOctree(vec3 ro, vec3 rd, int nodeIndex, out vec3 hitPos, out vec3 normal, out vec3 color) {
-    int stack[64];
+bool traverseOctree(vec3 ro, vec3 rd, out vec3 hitPos, out vec3 normal, out vec3 color) {
+    const int MAX_STACK_SIZE = 256;
+    int stack[MAX_STACK_SIZE];
     int stackPtr = 0;
-    stack[stackPtr++] = nodeIndex;
+    stack[stackPtr++] = 0; // Start with the root node
 
-    int y = 0;
+    while (stackPtr > 0 && stackPtr < MAX_STACK_SIZE) {
+        int nodeIndex = stack[--stackPtr];
 
-    while (s-tackPtr > 0) {
-        nodeIndex = stack[--stackPtr];
-        while (nodeIndex >= 0) {
-            y++;
-            GPUOctreeNode node = nodes[nodeIndex];
+        if (nodeIndex < 0) {
+            continue;
+        }
 
-            if (node.isActive == 0) {
-                nodeIndex = -1;
-                continue;
-            }
+        GPUOctreeNode node = nodes[nodeIndex];
 
-            float t = intersectVoxel(ro, rd, node.center - node.size * 0.5, node.size);
-
-            if (t > 0.0) {
-                if (node.isLeaf == 1) {
+        if (node.isLeaf == 1) {
+            if (node.isActive == 1) {
+                float t = intersectVoxel(ro, rd, node.center - node.size * 0.5, node.size);
+                if (t > 0.0) {
                     hitPos = ro + t * rd;
-                    vec3 voxelCenter = node.center;
-                    normal = computeNormal(hitPos, voxelCenter);
+                    normal = computeNormal(hitPos, node.center);
                     color = node.color;
-                    color = vec3(1,1,0);
                     return true;
-                } else {
-                    for (int i = 0; i < 8; ++i) {
-                        int childIndex = node.children[i];
-                        if (childIndex >= 0) {
-                            stack[stackPtr++] = childIndex;
-                        }
-                    }
                 }
             }
-            nodeIndex = -1;
+        } else {
+            for (int i = 0; i < 8; ++i) {
+                int childIndex = node.children[i];
+                if (childIndex >= 0) {
+                    stack[stackPtr++] = childIndex;
+                }
+            }
         }
-    }
-
-    if(y == 1){
-        color = vec3(0,1,0);
-    }else if(y == 2){
-        color = vec3(0,0,1);
-    }else if (y > 1){
-        color = vec3(1,0,0);
-    }else{
-        color = vec3(1,0,1);
     }
 
     return false;
 }
-
 
 void main() {
     vec2 uv = TexCoords * 2.0 - 1.0;
@@ -152,11 +97,10 @@ void main() {
 
     vec3 hitPos, normal, color;
 
-    if (traverseOctree(rayOrigin, rayDir, 0, hitPos, normal, color)) {
-        color = pow(color, vec3(0.4545));// Apply gamma correction
+    if (traverseOctree(rayOrigin, rayDir, hitPos, normal, color)) {
+        color = pow(color, vec3(0.4545)); // Apply gamma correction
         FragColor = vec4(color, 1.0);
     } else {
-        FragColor = vec4(color, 1.0);// Afficher la couleur de débogage
-        //FragColor = vec4(0,0,1,1);
+        FragColor = vec4(color, 1.0); // Debug color (blue) if no voxel is hit
     }
 }

@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <glm/glm.hpp>
+#include <string>
 #include "Voxel.h"
 
 struct GPUOctreeNode {
@@ -22,7 +23,7 @@ public:
     void insert(const Voxel& voxel, float voxelSize);
     bool isLeafNode() const;
     void serialize(std::vector<GPUOctreeNode>& data) const;
-    void serializeNode(const Octree* node, std::vector<GPUOctreeNode>& data) const;
+    bool serializeNode(const Octree* node, std::vector<GPUOctreeNode>& data) const;
 
 private:
     // The tree has up to eight children
