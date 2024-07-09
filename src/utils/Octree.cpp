@@ -94,12 +94,27 @@ bool Octree::serializeNode(const Octree* node, std::vector<GPUOctreeNode>& data)
         gpuNode.isActive = 1;
     }
 
-    std::cout << "Serializing node at (" << node->origin.x << ", " << node->origin.y << ", " << node->origin.z
-              << ") with size " << gpuNode.size << ", isLeaf: " << gpuNode.isLeaf
-              << ", isActive: " << gpuNode.isActive
-              << ", color: (" << gpuNode.color[0] << ", " << gpuNode.color[1] << ", " << gpuNode.color[2] << ")\n";
+//    std::cout << "Serializing node at (" << node->origin.x << ", " << node->origin.y << ", " << node->origin.z
+//              << ") with size " << gpuNode.size << ", isLeaf: " << gpuNode.isLeaf
+//              << ", isActive: " << gpuNode.isActive
+//              << ", color: (" << gpuNode.color[0] << ", " << gpuNode.color[1] << ", " << gpuNode.color[2] << ")\n";
 
     data[startIndex] = gpuNode;
 
     return gpuNode.isActive > 0;
+}
+
+void Octree::generateTerrain(float voxelSize, float frequency) {
+    FastNoiseLite perlin(155758515252845); // Seed
+
+    for (float x = -halfDimension.x; x <= halfDimension.x; x += voxelSize) {
+        for (float y = -halfDimension.y; y <= halfDimension.y; y += voxelSize) {
+            for (float z = -halfDimension.z; z <= halfDimension.z; z += voxelSize) {
+                float height = perlin.GetNoise(x * frequency, y * frequency, z * frequency) * 0.5f + 0.5f;
+                if (height < 0.5f) {
+                    insert(Voxel(origin + glm::vec3(x, y, z),glm::vec3(0.0f, 1.0f, 0.0f)), voxelSize);
+                }
+            }
+        }
+    }
 }

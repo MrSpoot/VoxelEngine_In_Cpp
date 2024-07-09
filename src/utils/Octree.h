@@ -4,7 +4,9 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include <string>
+#include <iostream>
 #include "Voxel.h"
+#include "FastNoiseLite.h"
 
 struct alignas(16) GPUOctreeNode {
     alignas(16) glm::vec3 center; // Aligné sur 16 octets
@@ -24,6 +26,7 @@ public:
     bool isLeafNode() const;
     void serialize(std::vector<GPUOctreeNode>& data) const;
     bool serializeNode(const Octree* node, std::vector<GPUOctreeNode>& data) const;
+    void generateTerrain(float voxelSize, float frequency);
 
 private:
     // The tree has up to eight children

@@ -83,7 +83,7 @@ int main() {
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
-    glfwSwapInterval(1);
+    glfwSwapInterval(0);
 
     // Glad: load all OpenGL function pointers
     // ---------------------------------------
@@ -147,19 +147,19 @@ int main() {
     // Unbind VAO
     glBindVertexArray(0);
 
-    Octree tree(glm::vec3(0), glm::vec3(100.0f));
+    glm::vec3 center(0.0f);
+    glm::vec3 halfDimension(50.0f, 10.0f, 50.0f); // Taille de l'octree
+    float voxelSize = 1.0f; // Taille de chaque voxel
+    float frequency = 0.1f; // Fréquence du bruit de Perlin
 
-    float voxelsize = 1.0f;
-
-    tree.insert(Voxel(glm::vec3(0.0), glm::vec3(1.0, 0.0, 1.0), true),voxelsize);
-    tree.insert(Voxel(glm::vec3(0.5), glm::vec3(1.0, 1.0, 0.0), true),voxelsize);
-    tree.insert(Voxel(glm::vec3(10.0), glm::vec3(1.0, 0.0, 0.0), true),voxelsize);
+    Octree octree(center, halfDimension);
+    octree.generateTerrain(voxelSize, frequency);
 
     std::cout << "Voxels inserted into the Octree.\n";
 
     // Sérialiser l'Octree
     std::vector<GPUOctreeNode> octreeData;
-    tree.serialize(octreeData);
+    octree.serialize(octreeData);
 
     //printOctreeData(octreeData);
 
