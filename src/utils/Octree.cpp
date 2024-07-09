@@ -64,21 +64,15 @@ bool Octree::serializeNode(const Octree* node, std::vector<GPUOctreeNode>& data)
     if (node == nullptr) return false;
 
     GPUOctreeNode gpuNode;
-    gpuNode.center[0] = node->origin.x;
-    gpuNode.center[1] = node->origin.y;
-    gpuNode.center[2] = node->origin.z;
+    gpuNode.center = node->origin;
     gpuNode.size = node->halfDimension.x * 2.0f;
     gpuNode.isLeaf = node->isLeafNode() ? 1 : 0;
     gpuNode.isActive = node->voxel != nullptr ? 1 : 0;
 
     if (node->voxel) {
-        gpuNode.color[0] = node->voxel->color.r;
-        gpuNode.color[1] = node->voxel->color.g;
-        gpuNode.color[2] = node->voxel->color.b;
+        gpuNode.color = node->voxel->color;
     } else {
-        gpuNode.color[0] = 0.0f;
-        gpuNode.color[1] = 0.0f;
-        gpuNode.color[2] = 0.0f;
+        gpuNode.color = glm::vec3(0.0f);
     }
 
     int startIndex = data.size();

@@ -54,7 +54,7 @@ bool traverseOctree(vec3 ro, vec3 rd, out vec3 hitPos, out vec3 normal, out vec3
     const int MAX_STACK_SIZE = 256;
     int stack[MAX_STACK_SIZE];
     int stackPtr = 0;
-    stack[stackPtr++] = 0; // Start with the root node
+    stack[stackPtr++] = 0;
 
     while (stackPtr > 0 && stackPtr < MAX_STACK_SIZE) {
         int nodeIndex = stack[--stackPtr];

@@ -6,13 +6,13 @@
 #include <string>
 #include "Voxel.h"
 
-struct GPUOctreeNode {
-    glm::vec3 center;
-    float size;
-    int children[8];
-    int isLeaf;
-    glm::vec3 color;
-    int isActive;
+struct alignas(16) GPUOctreeNode {
+    alignas(16) glm::vec3 center; // Aligné sur 16 octets
+    float size;       // Aligné sur 16 octets
+    int children[8];  // Aligné sur 16 octets
+    int isLeaf;       // Aligné sur 16 octets
+    alignas(16) glm::vec3 color;  // Aligné sur 16 octets
+    int isActive;     // Aligné sur 16 octets
 };
 
 class Octree {

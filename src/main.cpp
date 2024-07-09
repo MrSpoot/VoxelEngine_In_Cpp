@@ -54,24 +54,8 @@ GLuint createSSBO(const std::vector<GPUOctreeNode>& data) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     std::cout << "SSBO created with size " << data.size() * sizeof(GPUOctreeNode) << " bytes\n";
-    return ssbo;
-}
 
-void printOctreeData(const std::vector<GPUOctreeNode>& nodes) {
-    for (int y = 0; y < nodes.size(); ++y) {
-        GPUOctreeNode node = nodes[y];
-        std::cout << "Index : " << y << "\n";
-        std::cout << "Center: (" << node.center.x << ", " << node.center.y << ", " << node.center.z << ")\n";
-        std::cout << "Size: " << node.size << "\n";
-        std::cout << "Children: ";
-        for (int i = 0; i < 8; ++i) {
-            std::cout << node.children[i] << " ";
-        }
-        std::cout << "\n";
-        std::cout << "Is Leaf: " << node.isLeaf << "\n";
-        std::cout << "Color: (" << node.color.x << ", " << node.color.y << ", " << node.color.z << ")\n";
-        std::cout << "Is Active: " << node.isActive << "\n\n";
-    }
+    return ssbo;
 }
 
 
@@ -163,11 +147,13 @@ int main() {
     // Unbind VAO
     glBindVertexArray(0);
 
-    Octree tree(glm::vec3(0), glm::vec3(1));
+    Octree tree(glm::vec3(0), glm::vec3(100.0f));
 
     float voxelsize = 1.0f;
 
     tree.insert(Voxel(glm::vec3(0.0), glm::vec3(1.0, 0.0, 1.0), true),voxelsize);
+    tree.insert(Voxel(glm::vec3(0.5), glm::vec3(1.0, 1.0, 0.0), true),voxelsize);
+    tree.insert(Voxel(glm::vec3(10.0), glm::vec3(1.0, 0.0, 0.0), true),voxelsize);
 
     std::cout << "Voxels inserted into the Octree.\n";
 
@@ -175,7 +161,7 @@ int main() {
     std::vector<GPUOctreeNode> octreeData;
     tree.serialize(octreeData);
 
-    printOctreeData(octreeData);
+    //printOctreeData(octreeData);
 
     // Créez un SSBO et envoyez les données au GPU
     GLuint ssbo = createSSBO(octreeData);
