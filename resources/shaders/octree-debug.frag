@@ -11,6 +11,7 @@ uniform vec3 camUp;
 uniform float fov;
 uniform float aspectRatio;
 uniform int debugMode;
+uniform float adaptDebug;
 
 struct GPUOctreeNode {
     vec3 center;
@@ -139,6 +140,6 @@ void main() {
     }
 
     if(debugMode == 1){
-        FragColor = vec4(step)/64.;
+        FragColor = vec4(step)/adaptDebug;
     }
 }
