@@ -39,6 +39,7 @@ float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 bool cameraLock = true;
 bool wireframeMode = false;
+int debugMode = 0;
 
 // timing
 float deltaTime = 0.0f;    // time between current frame and last frame
@@ -148,12 +149,18 @@ int main() {
     glBindVertexArray(0);
 
     glm::vec3 center(0.0f);
-    glm::vec3 halfDimension(50.0f, 10.0f, 50.0f); // Taille de l'octree
+    glm::vec3 halfDimension(5); // Taille de l'octree
     float voxelSize = 1.0f; // Taille de chaque voxel
     float frequency = 0.1f; // Fréquence du bruit de Perlin
 
     Octree octree(center, halfDimension);
-    octree.generateTerrain(voxelSize, frequency);
+    //octree.generateTerrain(voxelSize, frequency);
+
+    octree.insert(Voxel(glm::vec3(0),glm::vec3(0.2,0.7,0.5)),voxelSize);
+    octree.insert(Voxel(glm::vec3(0,0,1),glm::vec3(0.2,0.7,0.5)),voxelSize);
+    octree.insert(Voxel(glm::vec3(8.0,2.5,0.5),glm::vec3(0.2,0.7,0.5)),0.5);
+    octree.insert(Voxel(glm::vec3(22.0,18,1),glm::vec3(0.2,0.7,0.5)),0.5);
+    octree.insert(Voxel(glm::vec3(85,25,56),glm::vec3(0.2,0.7,0.5)),0.125);
 
     std::cout << "Voxels inserted into the Octree.\n";
 
@@ -215,7 +222,7 @@ int main() {
         shader.setVec3("camUp", camera.Up);
         shader.setFloat("time",glfwGetTime());
         shader.setVec3("lightPos",lightPos);
-        shader.setInt("voxelGridSize",VOXEL_GRID_SIZE);
+        shader.setInt("debugMode",debugMode);
 
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -224,7 +231,7 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::SetNextWindowSize(ImVec2(325, 225));
+        ImGui::SetNextWindowSize(ImVec2(325, 250));
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.3);
         // Begin window with no title bar, no resize, no move, no scrollbar, no collapse, no nav, no background
@@ -248,6 +255,7 @@ int main() {
         //ImGui::InputFloat3("Light Pos",&lightPos[0]);
         ImGui::DragFloat3("Light Pos",&lightPos[0]);
         ImGui::DragFloat("Camera Speed",&camera.MovementSpeed);
+        ImGui::SliderInt("Debug Mode",&debugMode,0,1);
         ImGui::End();
 
         // Set wireframe mode

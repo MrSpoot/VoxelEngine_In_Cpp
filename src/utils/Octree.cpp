@@ -105,7 +105,7 @@ bool Octree::serializeNode(const Octree* node, std::vector<GPUOctreeNode>& data)
 }
 
 void Octree::generateTerrain(float voxelSize, float frequency) {
-    FastNoiseLite perlin(155758515252845); // Seed
+    FastNoiseLite perlin(123); // Seed
 
     for (float x = -halfDimension.x; x <= halfDimension.x; x += voxelSize) {
         for (float y = -halfDimension.y; y <= halfDimension.y; y += voxelSize) {

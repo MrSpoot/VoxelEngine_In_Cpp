@@ -10,6 +10,7 @@ uniform vec3 camRight;
 uniform vec3 camUp;
 uniform float fov;
 uniform float aspectRatio;
+uniform int debugMode;
 
 struct GPUOctreeNode {
     vec3 center;
@@ -50,7 +51,7 @@ vec3 computeNormal(vec3 hitPos, vec3 voxelCenter) {
     return normal;
 }
 
-bool traverseOctree(vec3 ro, vec3 rd, out vec3 hitPos, out vec3 normal, out vec3 color) {
+bool traverseOctree(vec3 ro, vec3 rd, out vec3 hitPos, out vec3 normal, out vec3 color, out int step) {
     const int MAX_STACK_SIZE = 64;
 
     int stack[MAX_STACK_SIZE];
@@ -60,7 +61,10 @@ bool traverseOctree(vec3 ro, vec3 rd, out vec3 hitPos, out vec3 normal, out vec3
     float closestHit = 1e20;
     bool hit = false;
 
+    step = 0;
+
     while (stackIndex > 0) {
+        step++;
         int nodeIndex = stack[--stackIndex];
         GPUOctreeNode node = nodes[nodeIndex];
 
@@ -105,8 +109,9 @@ vec3 light(vec3 pos, vec3 normal){
     vec3 rayOrigin = pos;
 
     vec3 hitPos, outNormal, color;
+    int step;
 
-    if (traverseOctree(rayOrigin, rayDir, hitPos, outNormal, color)) {
+    if (traverseOctree(rayOrigin, rayDir, hitPos, outNormal, color,step)) {
         return vec3(0.0);
     } else {
         return max(vec3(0.0),dot(normal,ln));
@@ -121,8 +126,9 @@ void main() {
     vec3 rayOrigin = camPos;
 
     vec3 hitPos, normal, color;
+    int step;
 
-    if (traverseOctree(rayOrigin, rayDir, hitPos, normal, color)) {
+    if (traverseOctree(rayOrigin, rayDir, hitPos, normal, color,step)) {
 
         color *= light(hitPos,normal) + 0.1;
 
@@ -130,5 +136,9 @@ void main() {
         FragColor = vec4(color, 1.0);
     } else {
         FragColor = vec4(0.2); // Debug color (blue) if no voxel is hit
+    }
+
+    if(debugMode == 1){
+        FragColor = vec4(step)/64.;
     }
 }
