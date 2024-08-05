@@ -98,10 +98,6 @@ bool traverseOctree(vec3 ro, vec3 rd, out vec3 hitPos, out vec3 normal, out vec3
             }
         }
 
-//        if (hit && tmin < closestHit) {
-//            break;
-//        }
-
     }
     return hit;
 }

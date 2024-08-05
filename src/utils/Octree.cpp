@@ -2,7 +2,7 @@
 #include <iostream>
 #include <random>
 
-Octree::Octree(const glm::vec3& origin, const glm::vec3& halfDimension)
+Octree::Octree(const glm::vec3 &origin, const glm::vec3 &halfDimension)
         : origin(origin), halfDimension(halfDimension), voxel(nullptr) {
     for (int i = 0; i < 8; ++i) {
         children[i] = nullptr;
@@ -16,7 +16,7 @@ Octree::~Octree() {
     delete voxel;
 }
 
-int Octree::getOctantContainingPoint(const glm::vec3& point) const {
+int Octree::getOctantContainingPoint(const glm::vec3 &point) const {
     int oct = 0;
     if (point.x >= origin.x) oct |= 4;
     if (point.y >= origin.y) oct |= 2;
@@ -24,7 +24,7 @@ int Octree::getOctantContainingPoint(const glm::vec3& point) const {
     return oct;
 }
 
-void Octree::insert(const Voxel& voxel, float voxelSize) {
+void Octree::insert(const Voxel &voxel, float voxelSize) {
     // Si ce noeud ne contient pas de voxel et que sa taille est adaptée, insérez-le ici
     if (this->voxel == nullptr && halfDimension.x * 2.0f <= voxelSize) {
         this->voxel = new Voxel(voxel);
@@ -57,11 +57,11 @@ void Octree::insert(const Voxel& voxel, float voxelSize) {
     children[octant]->insert(voxel, voxelSize);
 }
 
-void Octree::serialize(std::vector<GPUOctreeNode>& data) const {
+void Octree::serialize(std::vector<GPUOctreeNode> &data) const {
     serializeNode(this, data);
 }
 
-bool Octree::serializeNode(const Octree* node, std::vector<GPUOctreeNode>& data) const {
+bool Octree::serializeNode(const Octree *node, std::vector<GPUOctreeNode> &data) const {
     if (node == nullptr) return false;
 
     GPUOctreeNode gpuNode;
@@ -106,25 +106,33 @@ bool Octree::serializeNode(const Octree* node, std::vector<GPUOctreeNode>& data)
 }
 
 void Octree::generateTerrain(float voxelSize, float frequency) {
-
     int i = 0;
     int j;
     int k;
 
     for (float x = -halfDimension.x; x < halfDimension.x; x += voxelSize) {
         i++;
-        j=0;
+        j = 0;
         for (float y = -halfDimension.y; y < halfDimension.y; y += voxelSize) {
             j++;
-            k=0;
+            k = 0;
             for (float z = -halfDimension.z; z < halfDimension.z; z += voxelSize) {
                 k++;
+
+
+                //if (i % 2 + j % 2 + k % 2 == 0) {
+
                     std::random_device rd;
                     std::mt19937 gen(rd());
                     std::uniform_real_distribution<float> dis(0.0f, 1.0f);
 
                     //insert(Voxel(origin + glm::vec3(x, y, z),glm::vec3(dis(gen), dis(gen), dis(gen))), voxelSize);
-                    insert(Voxel(origin + glm::vec3(x, y, z),glm::vec3(i / (halfDimension.x * 2), j / (halfDimension.y * 2), k / (halfDimension.z * 2))), voxelSize);
+                    insert(Voxel(origin + glm::vec3(x, y, z),
+                                 glm::vec3(i / (halfDimension.x * 2), j / (halfDimension.y * 2),
+                                           k / (halfDimension.z * 2))), voxelSize);
+
+                //}
+
             }
         }
     }

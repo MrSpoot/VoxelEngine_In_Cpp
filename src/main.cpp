@@ -157,12 +157,6 @@ int main() {
     Octree octree(center, halfDimension);
     octree.generateTerrain(voxelSize,1);
 
-//    octree.insert(Voxel(glm::vec3(0),glm::vec3(0.2,0.7,0.5)),voxelSize);
-//    octree.insert(Voxel(glm::vec3(0,0,1),glm::vec3(0.2,0.7,0.5)),voxelSize);
-//    octree.insert(Voxel(glm::vec3(8.0,2.5,0.5),glm::vec3(0.2,0.7,0.5)),0.5);
-//    octree.insert(Voxel(glm::vec3(22.0,18,1),glm::vec3(0.2,0.7,0.5)),0.5);
-//    octree.insert(Voxel(glm::vec3(85,25,56),glm::vec3(0.2,0.7,0.5)),0.125);
-
     std::cout << "Voxels inserted into the Octree.\n";
 
     // Sérialiser l'Octree
