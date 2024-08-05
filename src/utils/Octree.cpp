@@ -1,5 +1,6 @@
 #include "Octree.h"
 #include <iostream>
+#include <random>
 
 Octree::Octree(const glm::vec3& origin, const glm::vec3& halfDimension)
         : origin(origin), halfDimension(halfDimension), voxel(nullptr) {
@@ -106,17 +107,24 @@ bool Octree::serializeNode(const Octree* node, std::vector<GPUOctreeNode>& data)
 
 void Octree::generateTerrain(float voxelSize, float frequency) {
 
-    int i,j,k = 0;
+    int i = 0;
+    int j;
+    int k;
 
-    for (float x = -halfDimension.x; x <= halfDimension.x; x += voxelSize) {
+    for (float x = -halfDimension.x; x < halfDimension.x; x += voxelSize) {
         i++;
-        for (float y = -halfDimension.y; y <= halfDimension.y; y += voxelSize) {
+        j=0;
+        for (float y = -halfDimension.y; y < halfDimension.y; y += voxelSize) {
             j++;
-            for (float z = -halfDimension.z; z <= halfDimension.z; z += voxelSize) {
+            k=0;
+            for (float z = -halfDimension.z; z < halfDimension.z; z += voxelSize) {
                 k++;
-                if(i % 2 == 0 && j % 2 == 0 && k % 2 == 0){
-                    insert(Voxel(origin + glm::vec3(x, y, z),glm::vec3(0.0f, 1.0f, 0.0f)), voxelSize);
-                }
+                    std::random_device rd;
+                    std::mt19937 gen(rd());
+                    std::uniform_real_distribution<float> dis(0.0f, 1.0f);
+
+                    //insert(Voxel(origin + glm::vec3(x, y, z),glm::vec3(dis(gen), dis(gen), dis(gen))), voxelSize);
+                    insert(Voxel(origin + glm::vec3(x, y, z),glm::vec3(i / (halfDimension.x * 2), j / (halfDimension.y * 2), k / (halfDimension.z * 2))), voxelSize);
             }
         }
     }

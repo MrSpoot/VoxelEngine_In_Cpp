@@ -150,7 +150,7 @@ int main() {
     glBindVertexArray(0);
 
     glm::vec3 center(0.0f);
-    glm::vec3 halfDimension(25); // Taille de l'octree
+    glm::vec3 halfDimension(32); // Taille de l'octree
     float voxelSize = 1.0f; // Taille de chaque voxel
     float frequency = 0.1f; // Fréquence du bruit de Perlin
 

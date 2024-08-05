@@ -12,6 +12,7 @@ uniform float fov;
 uniform float aspectRatio;
 uniform int debugMode;
 uniform float adaptDebug;
+uniform vec3 lightPos;
 
 struct GPUOctreeNode {
     vec3 center;
@@ -96,12 +97,17 @@ bool traverseOctree(vec3 ro, vec3 rd, out vec3 hitPos, out vec3 normal, out vec3
                 }
             }
         }
+
+//        if (hit && tmin < closestHit) {
+//            break;
+//        }
+
     }
     return hit;
 }
 
 vec3 light(vec3 pos, vec3 normal){
-    vec3 lp = vec3(15.0);
+    vec3 lp = lightPos;
 
     vec3 ld = lp - pos;
     vec3 ln = normalize(ld);
