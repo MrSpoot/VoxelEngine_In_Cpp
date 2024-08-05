@@ -351,7 +351,7 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
-    camera.setSpeed(camera.MovementSpeed + (yoffset * 0.0025));
+    camera.setSpeed(camera.MovementSpeed + (yoffset * 0.25));
     //camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
