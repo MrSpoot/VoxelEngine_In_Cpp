@@ -10,13 +10,14 @@
 #include "utils/Camera.h"
 #include "utils/Shader.h"
 #include "utils/Voxel.h"
-#include "utils/octree.h"
+#include "utils/Octree.cpp"
 
 #include <iostream>
 #include <vector>
 #include <numeric>
 #include <algorithm>
 #include <memory>
+#include <random>
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 
@@ -48,6 +49,16 @@ float lastFrame = 0.0f;
 
 const int VOXEL_GRID_SIZE = 64;
 
+Octree* buildOctree(const std::vector<Voxel>& voxels, const glm::vec3& origin, float worldSize) {
+    Octree* root = new Octree(origin, glm::vec3(worldSize * 0.5f));
+
+    for (const Voxel& voxel : voxels) {
+        root->insert(voxel, worldSize / pow(2, 1)); // maxDepth doit être défini en fonction de la taille de l'octree
+    }
+
+    return root;
+}
+
 GLuint createSSBO(const std::vector<GPUOctreeNode>& data) {
     GLuint ssbo;
     glGenBuffers(1, &ssbo);
@@ -56,6 +67,9 @@ GLuint createSSBO(const std::vector<GPUOctreeNode>& data) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     std::cout << "SSBO created with size " << data.size() * sizeof(GPUOctreeNode) << " bytes\n";
+
+    static_assert(sizeof(GPUOctreeNode) % 16 == 0, "GPUOctreeNode size must be a multiple of 16 bytes");
+    static_assert(alignof(GPUOctreeNode) == 16, "GPUOctreeNode must be aligned to 16 bytes");
 
     return ssbo;
 }
@@ -149,19 +163,28 @@ int main() {
     // Unbind VAO
     glBindVertexArray(0);
 
-    glm::vec3 center(0.0f);
-    glm::vec3 halfDimension(32); // Taille de l'octree
-    float voxelSize = 1.0f; // Taille de chaque voxel
-    float frequency = 0.1f; // Fréquence du bruit de Perlin
-
-    Octree octree(center, halfDimension);
-    octree.generateTerrain(voxelSize,1);
-
     std::cout << "Voxels inserted into the Octree.\n";
+
+    int size = 512;
+
+    std::vector<Voxel> voxels;
+
+    glm::vec3 center = glm::vec3(0);
+
+    for(int x = -size - 1; x < size; x++)
+    {
+        for(int y = -size; y < size; y++)
+        {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_real_distribution<float> dis(0.0f, 1.0f);
+            voxels.emplace_back(glm::vec3(x,0,y),glm::vec3(dis(gen),dis(gen),dis(gen)));
+        }
+    }
 
     // Sérialiser l'Octree
     std::vector<GPUOctreeNode> octreeData;
-    octree.serialize(octreeData);
+    buildOctree(voxels,glm::vec3(0),size * 2)->serialize(octreeData);
 
     //printOctreeData(octreeData);
 

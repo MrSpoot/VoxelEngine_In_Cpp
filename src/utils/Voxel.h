@@ -11,10 +11,9 @@
 struct Voxel {
     glm::vec3 position;
     glm::vec3 color;
-    bool isActive;
 
-    Voxel(const glm::vec3& position, const glm::vec3& color, bool isActive = true)
-            : position(position), color(color), isActive(isActive) {}
+    Voxel(const glm::vec3& position, const glm::vec3& color)
+            : position(position), color(color) {}
 };
 
 

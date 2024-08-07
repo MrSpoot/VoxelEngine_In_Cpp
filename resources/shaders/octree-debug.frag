@@ -10,9 +10,9 @@ uniform vec3 camRight;
 uniform vec3 camUp;
 uniform float fov;
 uniform float aspectRatio;
-uniform int debugMode;
-uniform float adaptDebug;
 uniform vec3 lightPos;
+uniform int debugMode;
+uniform int adaptDebug;
 
 struct GPUOctreeNode {
     vec3 center;
@@ -21,16 +21,19 @@ struct GPUOctreeNode {
     int isLeaf;
     vec3 color;
     int isActive;
+    float minDistance;
+    float maxDistance;
 };
 
 layout(std430, binding = 0) buffer OctreeBuffer {
     GPUOctreeNode nodes[];
 };
 
-float intersectVoxel(vec3 ro, vec3 rd, vec3 voxelPos, float voxelSize, out float tmin, out float tmax) {
+// Function to calculate the intersection of a ray with a voxel
+float intersectVoxel(vec3 ro, vec3 rd, vec3 voxelCenter, float voxelSize, out float tmin, out float tmax) {
     vec3 invDir = 1.0 / rd;
-    vec3 t0s = (voxelPos - ro) * invDir;
-    vec3 t1s = (voxelPos + voxelSize - ro) * invDir;
+    vec3 t0s = (voxelCenter - voxelSize * 0.5 - ro) * invDir;
+    vec3 t1s = (voxelCenter + voxelSize * 0.5 - ro) * invDir;
 
     vec3 tsmaller = min(t0s, t1s);
     vec3 tbigger = max(t0s, t1s);
@@ -41,6 +44,7 @@ float intersectVoxel(vec3 ro, vec3 rd, vec3 voxelPos, float voxelSize, out float
     return (tmax >= max(tmin, 0.0)) ? tmin : -1.0;
 }
 
+// Function to compute the normal based on the hit position and voxel center
 vec3 computeNormal(vec3 hitPos, vec3 voxelCenter) {
     vec3 normal = normalize(hitPos - voxelCenter);
     if (abs(normal.x) > abs(normal.y) && abs(normal.x) > abs(normal.z)) {
@@ -53,9 +57,9 @@ vec3 computeNormal(vec3 hitPos, vec3 voxelCenter) {
     return normal;
 }
 
+// Ray traversal function through the octree
 bool traverseOctree(vec3 ro, vec3 rd, out vec3 hitPos, out vec3 normal, out vec3 color, out int step) {
     const int MAX_STACK_SIZE = 64;
-
     int stack[MAX_STACK_SIZE];
     int stackIndex = 0;
     stack[stackIndex++] = 0; // Start with root node
@@ -63,9 +67,7 @@ bool traverseOctree(vec3 ro, vec3 rd, out vec3 hitPos, out vec3 normal, out vec3
     float closestHit = 1e20;
     bool hit = false;
 
-    step = 0;
-
-    while (stackIndex > 0) {
+    while (stackIndex > 0 && stackIndex < MAX_STACK_SIZE) {
         step++;
         int nodeIndex = stack[--stackIndex];
         GPUOctreeNode node = nodes[nodeIndex];
@@ -75,7 +77,7 @@ bool traverseOctree(vec3 ro, vec3 rd, out vec3 hitPos, out vec3 normal, out vec3
         }
 
         float tmin, tmax;
-        float t = intersectVoxel(ro, rd, node.center - node.size * 0.5, node.size, tmin, tmax);
+        float t = intersectVoxel(ro, rd, node.center, node.size, tmin, tmax);
 
         bool insideVoxel = all(greaterThanEqual(ro, node.center - vec3(node.size * 0.5))) &&
         all(lessThanEqual(ro, node.center + vec3(node.size * 0.5)));
@@ -92,35 +94,40 @@ bool traverseOctree(vec3 ro, vec3 rd, out vec3 hitPos, out vec3 normal, out vec3
             } else {
                 for (int i = 0; i < 8; ++i) {
                     if (node.children[i] != -1) {
+                        // Cull node if ray is far from the surface using minDistance
+                        if (node.minDistance > closestHit) {
+                            continue;
+                        }
                         stack[stackIndex++] = node.children[i];
                     }
                 }
             }
         }
-
     }
     return hit;
 }
 
+// Lighting function
 vec3 light(vec3 pos, vec3 normal){
     vec3 lp = lightPos;
-
     vec3 ld = lp - pos;
     vec3 ln = normalize(ld);
 
     vec3 rayDir = ld;
     vec3 rayOrigin = pos;
 
+    int step = 0;
+
     vec3 hitPos, outNormal, color;
-    int step;
 
     if (traverseOctree(rayOrigin, rayDir, hitPos, outNormal, color,step)) {
-        return vec3(0.0);
+        return vec3(0.0); // Shadowed
     } else {
-        return max(vec3(0.0),dot(normal,ln));
+        return max(vec3(0.0), dot(normal, ln)); // Direct lighting
     }
 }
 
+// Main rendering function
 void main() {
     vec2 uv = TexCoords * 2.0 - 1.0;
     uv.x *= aspectRatio;
@@ -129,16 +136,15 @@ void main() {
     vec3 rayOrigin = camPos;
 
     vec3 hitPos, normal, color;
+
     int step;
 
     if (traverseOctree(rayOrigin, rayDir, hitPos, normal, color,step)) {
-
-        color *= light(hitPos,normal) + 0.1;
-
-        color = pow(color, vec3(0.4545)); // Apply gamma correction
+        //color *= light(hitPos, normal) + 0.1;
+        //color = pow(color, vec3(0.4545)); // Apply gamma correction
         FragColor = vec4(color, 1.0);
     } else {
-        FragColor = vec4(0.2); // Debug color (blue) if no voxel is hit
+        FragColor = vec4(0.2); // Background color (dark gray)
     }
 
     if(debugMode == 1){
