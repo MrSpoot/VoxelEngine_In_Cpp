@@ -129,7 +129,7 @@ void main() {
 
                     vec3 color = vec3(voxels[index].color[0],voxels[index].color[1],voxels[index].color[2]);
 
-                    color *= light(hitPos,normal) + 0.1;
+                    //color *= light(hitPos,normal) + 0.1;
 
                     color = pow(color,vec3(0.4545));
 

@@ -1,15 +1,12 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "utils/Camera.h"
 #include "utils/Shader.h"
-#include "utils/OctreeNode.h"
+#include "utils/Voxel.h"
 
 #include <iostream>
 #include <vector>
@@ -54,7 +51,7 @@ void initVoxels(std::vector<Voxel>& voxels) {
                 voxels[index].color[1] = static_cast<float>(rand()) / RAND_MAX;
                 voxels[index].color[2] = static_cast<float>(rand()) / RAND_MAX;
 
-                voxels[index].isActive = (x % 4 == 0 && y == 8 && z % 4 == 0) || y == 2;
+                voxels[index].isActive = 1;
 
                 //voxels[index].isActive = false;
 //                    float zoom = 100.0;
@@ -182,7 +179,7 @@ int main() {
     initVoxels(voxels);
     GLuint ssbo = createSSBO(voxels);
 
-    Shader shader("../resources/shaders/raycast.vert","../resources/shaders/octree.frag");
+    Shader shader("../resources/shaders/raycast.vert","../resources/shaders/raycast.frag");
 
     shader.use();
 
