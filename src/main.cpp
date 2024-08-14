@@ -2,7 +2,6 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -83,8 +82,6 @@ int main() {
 
     class shader shader("../resources/shaders/vertex.glsl", "../resources/shaders/fragment.glsl");
 
-    class shader rayMarchingShader("../resources/shaders/ray-vert.glsl", "../resources/shaders/ray-frag.glsl");
-
     texture texture(glm::vec4(0.36, 0.76, 0.4, 1.0), 8, 8);
     texture.bind();
 
@@ -111,8 +108,7 @@ int main() {
     float averageFPS = 0.0f;
     float maxFps = 0.0f;
 
-    int simulationWidth = 1000;
-    int simulationDepth = 1000;
+    int size = 1;
 
     GLuint queryID;
     glGenQueries(1, &queryID);
@@ -120,17 +116,19 @@ int main() {
     int maxInstancedSize = 2500;
 
     std::vector<glm::mat4> modelMatrices;
-    modelMatrices.reserve(simulationWidth * simulationDepth); // Pré-allocation
+    modelMatrices.reserve(size * size * size); // Pré-allocation
 
     GLuint instanceVBO;
     glGenBuffers(1, &instanceVBO);
 
     // Initialisation des matrices de modèle
-    for (unsigned int x = 0; x < simulationWidth; x++) {
-        for (unsigned int z = 0; z < simulationDepth; z++) {
-            glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
-            model = glm::translate(model, glm::vec3(x, -3, z));
-            modelMatrices.push_back(model);
+    for (unsigned int x = 0; x < size; x++) {
+        for (unsigned int y = 0; y < size; y++) {
+            for (unsigned int z = 0; z < size; z++) {
+                glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+                model = glm::translate(model, glm::vec3(x, y, z));
+                modelMatrices.push_back(model);
+            }
         }
     }
 
@@ -174,6 +172,8 @@ int main() {
 
         // draw our first triangle
         shader.use();
+
+        shader.setVec3("camPos",camera.Position);
 
         glm::vec3 lightpos = glm::vec3(0.0, 15.0, 0.0);
         shader.setVec3("lightPos", lightpos);
@@ -239,10 +239,8 @@ int main() {
         if (showSecondWindow) {
             ImGui::Begin("Options");
             ImGui::Checkbox("Wireframe Mode", &wireframeMode);
-            ImGui::InputInt("Size X", &simulationWidth);
-            ImGui::InputInt("Size Y", &simulationDepth);
+            ImGui::InputInt("Size", &size);
             ImGui::InputInt("Max draw per instance", &maxInstancedSize);
-            ImGui::Text("Cube number: %i", simulationDepth * simulationWidth);
             ImGui::Text("Triangle render: %u", primitivesGenerated / 2);
             ImGui::Text("Instanced draw : %u", !drawingtype);
             ImGui::End();
