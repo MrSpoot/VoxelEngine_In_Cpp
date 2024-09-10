@@ -39,52 +39,6 @@ bool wireframeMode = false;
 float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
-const int VOXEL_GRID_SIZE = 64;
-
-void initVoxels(std::vector<Voxel>& voxels) {
-    for (int x = 0; x < VOXEL_GRID_SIZE; ++x) {
-        for (int y = 0; y < VOXEL_GRID_SIZE; ++y) {
-            for (int z = 0; z < VOXEL_GRID_SIZE; ++z) {
-
-                int index = x + y * VOXEL_GRID_SIZE + z * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE;
-                voxels[index].color[0] = static_cast<float>(rand()) / RAND_MAX;
-                voxels[index].color[1] = static_cast<float>(rand()) / RAND_MAX;
-                voxels[index].color[2] = static_cast<float>(rand()) / RAND_MAX;
-
-                voxels[index].isActive = 1;
-
-                //voxels[index].isActive = false;
-//                    float zoom = 100.0;
-//
-//                    int index = x + y * VOXEL_GRID_SIZE + z * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE;
-//                    voxels[index].color[0] = static_cast<float>(rand()) / RAND_MAX;
-//                    voxels[index].color[1] = static_cast<float>(rand()) / RAND_MAX;
-//                    voxels[index].color[2] = static_cast<float>(rand()) / RAND_MAX;
-//
-//
-//                    voxels[index].isActive = ((sin(x/zoom) + 1.0) / 2.0) * (VOXEL_GRID_SIZE / 2) > y && ((cos(z/zoom) + 1.0) / 2.0) * (VOXEL_GRID_SIZE / 2) > y;
-
-                    //voxels[index].color = glm::vec3(0.95,0.48,0.06);
-                    //voxels[index].isActive = (rand() % 50) == 0;
-                    //voxels[index].isActive = y == 1 || y == 8;
-                    //voxels[index].isActive = noiseValue > 0.5;
-                    //voxels[index].isActive = true;
-                    //voxels[index].isActive = x % spacing == 0 && y % spacing == 0 && z % spacing == 0;
-            }
-        }
-    }
-}
-
-GLuint createSSBO(const std::vector<Voxel>& voxels) {
-    GLuint ssbo;
-    glGenBuffers(1, &ssbo);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, voxels.size() * sizeof(Voxel), voxels.data(), GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo); // Lier le SSBO à l'index 0
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    return ssbo;
-}
-
 
 int main() {
     // glfw: initialize and configure
@@ -174,11 +128,6 @@ int main() {
     // Unbind VAO
     glBindVertexArray(0);
 
-    std::vector<Voxel> voxels;
-    voxels.resize(VOXEL_GRID_SIZE * VOXEL_GRID_SIZE * VOXEL_GRID_SIZE);
-    initVoxels(voxels);
-    GLuint ssbo = createSSBO(voxels);
-
     Shader shader("../resources/shaders/raycast.vert","../resources/shaders/raycast.frag");
 
     shader.use();
@@ -217,8 +166,6 @@ int main() {
         shader.setVec3("camRight", camera.Right);
         shader.setVec3("camUp", camera.Up);
         shader.setFloat("time",glfwGetTime());
-        shader.setVec3("lightPos",lightPos);
-        shader.setInt("voxelGridSize",VOXEL_GRID_SIZE);
 
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
