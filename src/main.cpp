@@ -39,6 +39,33 @@ bool wireframeMode = false;
 float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
+// Fonction SDF pour une sphère
+float sdSphere(float x, float y, float z, float centerX, float centerY, float centerZ, float radius) {
+    return sqrtf((x - centerX) * (x - centerX) +
+                 (y - centerY) * (y - centerY) +
+                 (z - centerZ) * (z - centerZ)) - radius;
+}
+
+// Générer une grille SDF 3D
+std::vector<float> generateSDF(int gridSize, float voxelSize,
+                               float centerX, float centerY, float centerZ, float radius) {
+    std::vector<float> sdfGrid(gridSize * gridSize * gridSize);
+
+    for (int z = 0; z < gridSize; ++z) {
+        for (int y = 0; y < gridSize; ++y) {
+            for (int x = 0; x < gridSize; ++x) {
+                float voxelX = x * voxelSize;
+                float voxelY = y * voxelSize;
+                float voxelZ = z * voxelSize;
+
+                int index = x + y * gridSize + z * gridSize * gridSize;
+                sdfGrid[index] = sdSphere(voxelX, voxelY, voxelZ, centerX, centerY, centerZ, radius);
+            }
+        }
+    }
+
+    return sdfGrid;
+}
 
 int main() {
     // glfw: initialize and configure
@@ -128,16 +155,44 @@ int main() {
     // Unbind VAO
     glBindVertexArray(0);
 
-    Shader shader("../resources/shaders/raycast.vert","../resources/shaders/raycast.frag");
+    GLuint sdfTexture;
+    glGenTextures(1, &sdfTexture);
+    glBindTexture(GL_TEXTURE_3D, sdfTexture);
+
+// Taille de la grille 3D (par exemple 64x64x64)
+    int gridSize = 64;
+
+// Générer les SDF pour une sphère
+    std::vector<float> sdfGrid = generateSDF(gridSize, 1.0, 32.0, 32.0, 32.0, 16.0);
+
+// Charger les données SDF dans la texture 3D
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, gridSize, gridSize, gridSize, 0, GL_RED, GL_FLOAT, &sdfGrid[0]);
+
+// Paramètres de la texture
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    std::cout << "Sampler3D created with size " << sdfGrid.size() * sizeof(float) << " bytes\n";
+
+    Shader shader("../resources/shaders/raycast.vert","../resources/shaders/raymarch.frag");
 
     shader.use();
 
     shader.setFloat("fov", glm::radians(90.0f));
     shader.setFloat("aspectRatio", (float)SCR_WIDTH/(float)SCR_HEIGHT);
+    shader.setFloat("size",gridSize);
 
     glm::vec3 voxelWorldMin = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 voxelWorldMax = glm::vec3(32.0f, 32.0f, 32.0f);
     glm::vec3 lightPos = glm::vec3(32.0,80.0,32.0);
+
+    shader.use();
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_3D,sdfTexture);
+    shader.setInt("sdfTexture",0);
 
     // render loop
     // -----------
