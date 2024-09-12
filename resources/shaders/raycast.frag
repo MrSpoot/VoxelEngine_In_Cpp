@@ -1,13 +1,10 @@
 #version 430 core
 
-#define MAX_STEPS 128
-#define MIN_STEP_SIZE 0.001
-#define MAX_STEP_SIZE 64
-
 out vec4 FragColor;
 in vec2 TexCoords;
 
 // Paramètres de la caméra
+uniform vec3 lightPos;
 uniform vec3 camPos;      // Position de la caméra
 uniform vec3 camDir;      // Direction de la caméra
 uniform vec3 camRight;    // Vecteur à droite de la caméra
@@ -15,140 +12,147 @@ uniform vec3 camUp;       // Vecteur vers le haut de la caméra
 uniform float fov;        // Champ de vision (en radians)
 uniform float aspectRatio; // Rapport d'aspect de l'écran (width / height)
 uniform float time;
+uniform int voxelGridSize;
 
-vec2 dBox(vec3 p, vec3 s, float i){
+struct Voxel {
+    float color[3];
+    bool isActive;
+};
 
-    vec3 diff = abs(p) - s;
-    float de = length(max(diff,0.0));
+// Déclarer le SSBO
+layout(std430, binding = 0) buffer Voxels {
+    Voxel voxels[];
+};
 
-    float di = min(max(diff.x,max(diff.y,diff.z)),0.0);
+// Position et taille de la grille de voxels
+const vec3 voxelGridMin = vec3(0.0, 0.0, 0.0);
+const float voxelSize = 1.0;
 
-    float d = de + di;
+float intersectVoxel(vec3 ro, vec3 rd, vec3 voxelPos, float voxelSize) {
+    vec3 invDir = 1.0 / rd;
+    vec3 t0s = (voxelPos - ro) * invDir;
+    vec3 t1s = (voxelPos + voxelSize - ro) * invDir;
 
-    return vec2(i,d);
+    vec3 tsmaller = min(t0s, t1s);
+    vec3 tbigger = max(t0s, t1s);
+
+    float tmin = max(max(tsmaller.x, tsmaller.y), tsmaller.z);
+    float tmax = min(min(tbigger.x, tbigger.y), tbigger.z);
+
+    return (tmax >= max(tmin, 0.0)) ? tmin : -1.0;
 }
 
-vec2 dPlane(vec3 p, float h, float i){
-    return vec2(i,p.y - h);
-}
-
-vec2 dSphere(vec3 p, float r,float i){
-    return vec2(i,length(p) - r);
-}
-
-vec2 sdTorus( vec3 p, vec2 t, float i){
-    vec2 q = vec2(length(p.xz)-t.x,p.y);
-    float d = length(q)-t.y;
-
-    return vec2(i,d);
-}
-
-vec2 minVec2(vec2 a, vec2 b){
-    return a.y < b.y ? a : b;
-}
-
-vec2 scene(vec3 p){
-
-    vec2 dp = dPlane(p,-0.5,0.0);
-    vec2 ds = dSphere(p - vec3(0.0,-0.5,1.5),0.25,1.0);
-    vec2 db = dBox(p - vec3(0.0,0.0,1.5),vec3(0.2),2.0);
-    vec2 dt = sdTorus(p - vec3(2.0,0.0,1.5),vec2(0.5,0.2),1.0);
-
-    return minVec2(dp,minVec2(ds,minVec2(db,dt)));
-}
-
-vec3 material(float i){
-
-    vec3 col = vec3(0.0);
-
-    if(i < 0.5){
-        col = vec3(0.7);
-    }else if(i < 1.5){
-        col =  vec3(1,0,0);
-    }else if(i < 2.5){
-        col =  vec3(0,1,0);
-    }else if(i < 3.5){
-        col =  vec3(0,0,1);
-    }
-
-    return col * vec3(0.2);
-}
-
-vec2 march(vec3 ro, vec3 rd){
-    vec3 cp = ro;
-    float d = 0.0;
-    vec2 s = vec2(0.0);
-
-    for(int i = 0; i < MAX_STEPS; i++){
-        cp = ro + rd * d;
-        s = scene(cp);
-        d += s.y;
-
-        if(s.y < MIN_STEP_SIZE){
-            break;
-        }
-
-        if(d > MAX_STEP_SIZE){
-            return vec2(100.0,MAX_STEP_SIZE + 10.0);
-        }
-    }
-    s.y = d;
-    return s;
-}
-
-vec3 normal(vec3 p){
-    float dp = scene(p).y;
-    vec2 eps = vec2(0.01,0);
-
-    float dx = scene(p + eps.xyy).y - dp;
-    float dy = scene(p + eps.yxy).y - dp;
-    float dz = scene(p + eps.yyx).y - dp;
-
-    return normalize(vec3(dx,dy,dz));
-}
-
-
-float lighting(vec3 p, vec3 n){
-    vec3 lp = vec3(cos(time) * 2.0,1.0,sin(time));
-    //vec3 lp = vec3(3,2,-0.5);
-    vec3 ld = lp - p;
+vec3 light(vec3 pos, vec3 normal){
+    vec3 lp = vec3(cos(time) * 512.0 + voxelGridSize / 2.0,512.0,sin(time) * 512.0+ voxelGridSize / 2.0);
+    //vec3 lp = vec3(voxelGridSize/2.0,voxelGridSize * 2.0,voxelGridSize/2.0);
+    //vec3 lp = lightPos;
+    vec3 ld = lp - pos;
     vec3 ln = normalize(ld);
 
-    if(march(p + n * 0.01,ln).y < length(ld)){
-        return 0.0;
+    vec3 rayDir = ld;
+    vec3 rayOrigin = pos;
+
+    vec3 voxelPos = floor((rayOrigin / voxelSize) * voxelSize) + normal * 0.001;
+    vec3 step = sign(rayDir);
+    vec3 tMax = ((voxelPos + step * 0.5 + step * 0.5 * sign(rayDir) - rayOrigin) / rayDir);
+    vec3 tDelta = abs(step / rayDir);
+
+    for (int i = 0; i < 1024; i++) {
+        float t = intersectVoxel(rayOrigin, rayDir, voxelPos, voxelSize);
+        if (t > 0.0) {
+            int indexX = int(voxelPos.x / voxelSize);
+            int indexY = int(voxelPos.y / voxelSize);
+            int indexZ = int(voxelPos.z / voxelSize);
+
+            if (indexX >= 0 && indexX < voxelGridSize && indexY >= 0 && indexY < voxelGridSize && indexZ >= 0 && indexZ < voxelGridSize) {
+                int index = indexX + indexY * voxelGridSize + indexZ * voxelGridSize * voxelGridSize;
+                if (voxels[index].isActive) {
+                    return vec3(0.0);
+                }
+            }
+        }
+
+        if (tMax.x < tMax.y && tMax.x < tMax.z) {
+            voxelPos.x += step.x;
+            tMax.x += tDelta.x;
+        } else if (tMax.y < tMax.z) {
+            voxelPos.y += step.y;
+            tMax.y += tDelta.y;
+        } else {
+            voxelPos.z += step.z;
+            tMax.z += tDelta.z;
+        }
     }
-
-
-    return max(0.0,dot(n,ln));
+    //return max(vec3(0.0),dot(normal,ln));
+    return max(vec3(0.0),dot(normal,ln));
 }
 
+vec3 normal(vec3 hitPos, vec3 voxelCenter) {
+    vec3 normal = normalize(hitPos - voxelCenter);
+    // Clamp the normal to the closest axis
+    if (abs(normal.x) > abs(normal.y) && abs(normal.x) > abs(normal.z)) {
+        normal = vec3(sign(normal.x), 0.0, 0.0);
+    } else if (abs(normal.y) > abs(normal.x) && abs(normal.y) > abs(normal.z)) {
+        normal = vec3(0.0, sign(normal.y), 0.0);
+    } else {
+        normal = vec3(0.0, 0.0, sign(normal.z));
+    }
+    return normal;
+}
 
 void main() {
     vec2 uv = TexCoords * 2.0 - 1.0;
     uv.x *= aspectRatio;
 
-    vec3 rd = normalize(camDir + uv.x * tan(fov / 2.0) * camRight + uv.y * tan(fov / 2.0) * camUp);
-    vec3 ro = camPos;
+    vec3 rayDir = normalize(camDir + uv.x * tan(fov / 2.0) * camRight + uv.y * tan(fov / 2.0) * camUp);
+    vec3 rayOrigin = camPos;
 
-    vec2 s = march(ro,rd);
+    vec3 voxelPos = floor((rayOrigin / voxelSize) * voxelSize);
+    vec3 step = sign(rayDir);
+    vec3 tMax = ((voxelPos + step * 0.5 + step * 0.5 * sign(rayDir) - rayOrigin) / rayDir);
+    vec3 tDelta = abs(step / rayDir);
 
-    vec3 skyCol = vec3(1.0);
+    for (int i = 0; i < 1024; i++) {
+        float t = intersectVoxel(rayOrigin, rayDir, voxelPos, voxelSize);
+        if (t > 0.0) {
+            int indexX = int(voxelPos.x / voxelSize);
+            int indexY = int(voxelPos.y / voxelSize);
+            int indexZ = int(voxelPos.z / voxelSize);
 
-    vec3 color = mix(vec3(1.0),vec3(0.0,0.2,1.0),uv.y + 0.6);
-    float d = s.y;
+            if (indexX >= 0 && indexX < voxelGridSize && indexY >= 0 && indexY < voxelGridSize && indexZ >= 0 && indexZ < voxelGridSize) {
+                int index = indexX + indexY * voxelGridSize + indexZ * voxelGridSize * voxelGridSize;
+                if (voxels[index].isActive) {
 
-    if(d < MAX_STEP_SIZE){
-        color = material(s.x);
-        vec3 p = ro + rd * d;
-        vec3 nor = normal(p);
-        float l = lighting(p,nor);
-        vec3 a = vec3(10.0,7.0,2.0) * 0.01;
-        vec3 as = (nor.y * skyCol) * 0.5;
-        color = color * (a + l + as);
-        //color = nor;
+                    vec3 hitPos = rayOrigin + rayDir * t;
+                    vec3 voxelCenter = voxelPos + vec3(0.5 * voxelSize);
+                    vec3 normal = normal(hitPos, voxelCenter);
+
+                    vec3 color = vec3(voxels[index].color[0],voxels[index].color[1],voxels[index].color[2]);
+
+                    color *= light(hitPos,normal) + 0.1;
+
+                    color = pow(color,vec3(0.4545));
+
+                    //color = light(hitPos,normal) + 0.1;
+
+                    FragColor = vec4(color, 1.0);
+                    //FragColor = vec4(normal + 0.1,1.0);
+                    return;
+                }
+            }
+        }
+
+        if (tMax.x < tMax.y && tMax.x < tMax.z) {
+            voxelPos.x += step.x;
+            tMax.x += tDelta.x;
+        } else if (tMax.y < tMax.z) {
+            voxelPos.y += step.y;
+            tMax.y += tDelta.y;
+        } else {
+            voxelPos.z += step.z;
+            tMax.z += tDelta.z;
+        }
     }
 
-    color = pow(color,vec3(0.4545));
-
-    FragColor = vec4(color,1.0);
+    FragColor = vec4(0.0, 0.0, 0.0, 1.0);
 }

@@ -28,7 +28,7 @@ const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, -3.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, -6.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -160,10 +160,10 @@ int main() {
     glBindTexture(GL_TEXTURE_3D, sdfTexture);
 
 // Taille de la grille 3D (par exemple 64x64x64)
-    int gridSize = 64;
+    int gridSize = 8;
 
 // Générer les SDF pour une sphère
-    std::vector<float> sdfGrid = generateSDF(gridSize, 1.0, 32.0, 32.0, 32.0, 16.0);
+    std::vector<float> sdfGrid = generateSDF(gridSize, 1.0, gridSize/ 2.0, gridSize/ 2.0, gridSize/ 2.0, 2.0);
 
 // Charger les données SDF dans la texture 3D
     glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, gridSize, gridSize, gridSize, 0, GL_RED, GL_FLOAT, &sdfGrid[0]);
