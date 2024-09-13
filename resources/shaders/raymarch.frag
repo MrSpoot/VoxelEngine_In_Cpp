@@ -20,6 +20,28 @@ uniform float size;
 uniform int renderingMode;
 
 uniform sampler3D sdfTexture;
+uniform sampler2D colorTexture;
+
+struct HitInfo {
+    vec3 vpos;
+};
+
+vec3 triplanarMapping(vec3 pos, vec3 normal) {
+    vec3 absNormal = abs(normal);
+    vec3 blend = absNormal / (absNormal.x + absNormal.y + absNormal.z);
+
+    vec2 uvX = pos.yz;// Projeter sur l'axe X
+    vec2 uvY = pos.xz; // Projeter sur l'axe Y
+    vec2 uvZ = pos.xy;  // Projeter sur l'axe Z
+
+    vec3 colorX = texture(colorTexture, uvX).rgb;
+    vec3 colorY = texture(colorTexture, uvY).rgb;
+    vec3 colorZ = texture(colorTexture, uvZ).rgb;
+
+    vec3 finalColor = colorX * blend.x + colorY * blend.y + colorZ * blend.z;
+
+    return finalColor;
+}
 
 float sdTorus( vec3 p, vec2 t )
 {
@@ -37,13 +59,18 @@ vec3 getVoxelPos(vec3 p, float s)
     return (floor(p / s) + 0.5) * s;
 }
 
+vec3 getVoxelColor(vec3 voxelPos) {
+    vec2 uv = fract((voxelPos.xz / size) * 100);
+    vec3 color = texture(colorTexture, uv).rgb;
+    return color;
+}
+
 float getSDF(vec3 p) {
     vec3 texCoord = (p + vec3(size / 2.0)) / size;
     return texture(sdfTexture, texCoord).r;
-    //return min(sdSphere(p,2.0),sdTorus(p,vec2(8.0,2.0)));
 }
 
-float trace(vec3 ro, vec3 rd){
+float trace(vec3 ro, vec3 rd, out HitInfo hit){
 
     const float s = VOXEL_SIZE;
     const float sd = s * sqrt(3.0);
@@ -110,6 +137,7 @@ float trace(vec3 ro, vec3 rd){
                 t2.y <= t2.z ? vec3(0,srd.y,0) : vec3(0,0,srd.z);
 
                 if(d < 0.0){
+                    hit.vpos = vpos;
                     return t;
                 }else if(d > sd && vi > 2){
                     voxel = false;
@@ -147,14 +175,22 @@ void main() {
     vec3 ro = camPos;
 
     vec3 color = vec3(0.0);
-    float d = trace(ro, rd);
+
+    HitInfo hit;
+
+    hit.vpos = vec3(0.0);
+
+    float d = trace(ro, rd,hit);
 
     if (d < MAX_STEP_SIZE && d > 0.0){
         vec3 p = ro + rd * d;
         vec3 nor = normal(p);
         //color = nor * 0.5 - 0.5;
         color = normalize(p);
+        color = triplanarMapping(hit.vpos,nor);
     }
+
+    //color = pow(color,vec3(0.4545));
 
     FragColor = vec4(color, 1.0);
 }

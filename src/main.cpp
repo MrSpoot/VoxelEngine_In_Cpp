@@ -7,6 +7,7 @@
 #include "utils/Camera.h"
 #include "utils/Shader.h"
 #include "utils/Voxel.h"
+#include "stb_image.h"
 
 #include <iostream>
 #include <vector>
@@ -39,6 +40,42 @@ int renderingMode = 0;
 // timing
 float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
+
+GLuint loadTexture(const char* filePath) {
+    // Variables pour stocker la largeur, hauteur et nombre de canaux de l'image
+    int width, height, nrChannels;
+
+    // Charger l'image à partir du fichier avec stb_image
+    unsigned char* data = stbi_load(filePath, &width, &height, &nrChannels, 0);
+
+    GLuint textureID;
+    if (data) {
+        // Générer un ID de texture OpenGL
+        glGenTextures(1, &textureID);
+        glBindTexture(GL_TEXTURE_2D, textureID);  // Lier la texture 2D
+
+        // Paramètres de texture
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);    // Répéter la texture horizontalement
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);    // Répéter la texture verticalement
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);// Filtrage quand la texture est réduite
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);// Filtrage quand la texture est agrandie
+
+        // Vérifier si l'image contient un canal alpha (4 canaux)
+        GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
+
+        // Charger les données de texture dans OpenGL
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);  // Générer les mipmaps pour la texture
+
+        // Libérer l'image après l'avoir chargée en OpenGL
+        stbi_image_free(data);
+    } else {
+        std::cerr << "Failed to load texture: " << filePath << std::endl;
+        textureID = 0;  // Si l'image n'a pas pu être chargée, retourner 0
+    }
+
+    return textureID;
+}
 
 // Fonction SDF pour une sphère
 float sdSphere(float x, float y, float z, float centerX, float centerY, float centerZ, float radius) {
@@ -160,11 +197,10 @@ int main() {
     glGenTextures(1, &sdfTexture);
     glBindTexture(GL_TEXTURE_3D, sdfTexture);
 
-// Taille de la grille 3D (par exemple 64x64x64)
     int gridSize = 64;
 
 // Générer les SDF pour une sphère
-    std::vector<float> sdfGrid = generateSDF(gridSize, 1.0, gridSize/ 2.0, gridSize/ 2.0, gridSize/ 2.0, 2.0);
+    std::vector<float> sdfGrid = generateSDF(gridSize, 1.0, gridSize/ 2.0, gridSize/ 2.0, gridSize/ 2.0, 4.0);
 
 // Charger les données SDF dans la texture 3D
     glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, gridSize, gridSize, gridSize, 0, GL_RED, GL_FLOAT, &sdfGrid[0]);
@@ -192,6 +228,11 @@ int main() {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_3D,sdfTexture);
     shader.setInt("sdfTexture",0);
+
+    GLuint colorTexture = loadTexture("../resources/dirt.png");
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, colorTexture);
+    shader.setInt("colorTexture",1);
 
     // render loop
     // -----------
