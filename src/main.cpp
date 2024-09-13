@@ -161,7 +161,7 @@ int main() {
     glBindTexture(GL_TEXTURE_3D, sdfTexture);
 
 // Taille de la grille 3D (par exemple 64x64x64)
-    int gridSize = 512;
+    int gridSize = 64;
 
 // Générer les SDF pour une sphère
     std::vector<float> sdfGrid = generateSDF(gridSize, 1.0, gridSize/ 2.0, gridSize/ 2.0, gridSize/ 2.0, 2.0);

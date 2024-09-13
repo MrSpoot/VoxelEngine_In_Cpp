@@ -3,7 +3,7 @@
 #define MAX_STEPS 128
 #define MIN_STEP_SIZE 1e-4
 #define MAX_STEP_SIZE 32.0
-#define VOXEL_SIZE 0.25
+#define VOXEL_SIZE 0.1
 
 out vec4 FragColor;
 in vec2 TexCoords;
@@ -93,6 +93,10 @@ float trace(vec3 ro, vec3 rd){
                     voxel = true;
                     vi = 0;
                 }
+
+                if(d > MAX_STEP_SIZE){
+                    return -1.0;
+                }
             }else{
                 vec3 n = (ro - vpos) * ird;
                 vec3 k = ard * s * 0.5;
@@ -147,7 +151,8 @@ void main() {
 
     if (d < MAX_STEP_SIZE && d > 0.0){
         vec3 p = ro + rd * d;
-        //vec3 nor = normal(p);
+        vec3 nor = normal(p);
+        //color = nor * 0.5 - 0.5;
         color = normalize(p);
     }
 
