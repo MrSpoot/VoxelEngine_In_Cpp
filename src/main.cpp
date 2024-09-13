@@ -34,6 +34,7 @@ float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 bool cameraLock = true;
 bool wireframeMode = false;
+int renderingMode = 0;
 
 // timing
 float deltaTime = 0.0f;    // time between current frame and last frame
@@ -160,7 +161,7 @@ int main() {
     glBindTexture(GL_TEXTURE_3D, sdfTexture);
 
 // Taille de la grille 3D (par exemple 64x64x64)
-    int gridSize = 8;
+    int gridSize = 512;
 
 // Générer les SDF pour une sphère
     std::vector<float> sdfGrid = generateSDF(gridSize, 1.0, gridSize/ 2.0, gridSize/ 2.0, gridSize/ 2.0, 2.0);
@@ -185,8 +186,6 @@ int main() {
     shader.setFloat("aspectRatio", (float)SCR_WIDTH/(float)SCR_HEIGHT);
     shader.setFloat("size",gridSize);
 
-    glm::vec3 voxelWorldMin = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 voxelWorldMax = glm::vec3(32.0f, 32.0f, 32.0f);
     glm::vec3 lightPos = glm::vec3(32.0,80.0,32.0);
 
     shader.use();
@@ -221,6 +220,7 @@ int main() {
         shader.setVec3("camRight", camera.Right);
         shader.setVec3("camUp", camera.Up);
         shader.setFloat("time",glfwGetTime());
+        shader.setInt("renderingMode",renderingMode);
 
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -249,9 +249,8 @@ int main() {
 
         ImGui::Text("Average FPS: %.1f", averageFPS);
         ImGui::Text("Max FPS: %.1f", maxFps);
-        //ImGui::InputFloat3("Light Pos",&lightPos[0]);
-        ImGui::DragFloat3("Light Pos",&lightPos[0]);
         ImGui::DragFloat("Camera Speed",&camera.MovementSpeed);
+        ImGui::SliderInt("Rendering",&renderingMode,0,1);
         ImGui::End();
 
         // Set wireframe mode

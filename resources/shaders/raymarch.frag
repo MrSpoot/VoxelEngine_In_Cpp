@@ -17,6 +17,8 @@ uniform float aspectRatio;
 uniform float time;
 uniform float size;
 
+uniform int renderingMode;
+
 uniform sampler3D sdfTexture;
 
 float sdTorus( vec3 p, vec2 t )
@@ -53,54 +55,73 @@ float trace(vec3 ro, vec3 rd){
 
     float t = 0.0;
 
-    vec3 vpos = getVoxelPos(ro, s);
+    if(renderingMode == 1){
+        for (int i = 0; i < MAX_STEPS; i++)
+        {
+            vec3 pos = ro + rd * t;
+            float d = getSDF(pos);
 
-    bool voxel = false;
-    int vi = 0;
-    vec3 prd = vec3(0);
+            if (d < MIN_STEP_SIZE)
+            {
+                return t;
+            }
 
-    for (int i = 0; i < MAX_STEPS; i++){
-
-        vec3 pos = ro + rd * t;
-
-        float d = getSDF(voxel ? vpos : pos);
-
-        if(!voxel){
             t += d;
 
-            if (d < sd)
-            {
-                vpos = getVoxelPos(ro + rd * max(t - sd, 0.0), s);
-                voxel = true;
-                vi = 0;
-            }
-        }else{
-            vec3 n = (ro - vpos) * ird;
-            vec3 k = ard * s * 0.5;
-
-            vec3 t1 = -n - k;
-            vec3 t2 = -n + k;
-
-            float tF = min(min(t2.x, t2.y), t2.z);
-
-            vec3 nrd = t2.x <= t2.y && t2.x <= t2.z ? vec3(srd.x,0,0) :
-            t2.y <= t2.z ? vec3(0,srd.y,0) : vec3(0,0,srd.z);
-
-            if(d < 0.0){
-                return t;
-            }else if(d > sd && vi > 2){
-                voxel = false;
-                t = tF + sd;
-                continue;
-            }
-
-            vpos += nrd * s;
-            prd = nrd;
-            t = tF;
-            vi++;
-
-            if (t >= MAX_STEP_SIZE) return -1.0;
+            if (t >= MAX_STEP_SIZE)
+            return -1.0;
         }
+    }else if (renderingMode == 0){
+        vec3 vpos = getVoxelPos(ro, s);
+
+        bool voxel = false;
+        int vi = 0;
+        vec3 prd = vec3(0);
+
+        for (int i = 0; i < MAX_STEPS; i++){
+
+            vec3 pos = ro + rd * t;
+
+            float d = getSDF(voxel ? vpos : pos);
+
+            if(!voxel){
+                t += d;
+
+                if (d < sd)
+                {
+                    vpos = getVoxelPos(ro + rd * max(t - sd, 0.0), s);
+                    voxel = true;
+                    vi = 0;
+                }
+            }else{
+                vec3 n = (ro - vpos) * ird;
+                vec3 k = ard * s * 0.5;
+
+                vec3 t1 = -n - k;
+                vec3 t2 = -n + k;
+
+                float tF = min(min(t2.x, t2.y), t2.z);
+
+                vec3 nrd = t2.x <= t2.y && t2.x <= t2.z ? vec3(srd.x,0,0) :
+                t2.y <= t2.z ? vec3(0,srd.y,0) : vec3(0,0,srd.z);
+
+                if(d < 0.0){
+                    return t;
+                }else if(d > sd && vi > 2){
+                    voxel = false;
+                    t = tF + sd;
+                    continue;
+                }
+
+                vpos += nrd * s;
+                prd = nrd;
+                t = tF;
+                vi++;
+
+                if (t >= MAX_STEP_SIZE) return -1.0;
+            }
+        }
+        return -1.0;
     }
     return -1.0;
 }
@@ -126,8 +147,8 @@ void main() {
 
     if (d < MAX_STEP_SIZE && d > 0.0){
         vec3 p = ro + rd * d;
-        vec3 nor = normal(p);
-        color = nor * 0.5 + 0.5;
+        //vec3 nor = normal(p);
+        color = normalize(p);
     }
 
     FragColor = vec4(color, 1.0);
