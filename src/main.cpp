@@ -6,7 +6,6 @@
 #include "imgui_impl_opengl3.h"
 #include "utils/Camera.h"
 #include "utils/Shader.h"
-#include "utils/Voxel.h"
 #include "stb_image.h"
 
 #include <iostream>
@@ -24,6 +23,11 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 
 float calculateFPS(std::vector<float> &fpsValues, float &averageFPS, float &maxFps);
 
+struct RenderingProperties {
+    bool showNormals;
+    bool showSteps;
+};
+
 // settings
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
@@ -35,7 +39,6 @@ float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 bool cameraLock = true;
 bool wireframeMode = false;
-int renderingMode = 0;
 
 // timing
 float deltaTime = 0.0f;    // time between current frame and last frame
@@ -57,8 +60,8 @@ GLuint loadTexture(const char* filePath) {
         // Paramètres de texture
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);    // Répéter la texture horizontalement
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);    // Répéter la texture verticalement
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);// Filtrage quand la texture est réduite
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);// Filtrage quand la texture est agrandie
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);// Filtrage quand la texture est réduite
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);// Filtrage quand la texture est agrandie
 
         // Vérifier si l'image contient un canal alpha (4 canaux)
         GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
@@ -200,7 +203,8 @@ int main() {
     int gridSize = 64;
 
 // Générer les SDF pour une sphère
-    std::vector<float> sdfGrid = generateSDF(gridSize, 1.0, gridSize/ 2.0, gridSize/ 2.0, gridSize/ 2.0, 4.0);
+    std::vector<float> sdfGrid = generateSDF(gridSize, 1.0, gridSize/ 2.0, gridSize/ 2.0, gridSize/ 2.0, 8.0);
+    //std::vector<float> sdfGrid = generateTerrainSDF(gridSize, 1.0, 0.5, 0.8);
 
 // Charger les données SDF dans la texture 3D
     glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, gridSize, gridSize, gridSize, 0, GL_RED, GL_FLOAT, &sdfGrid[0]);
@@ -211,6 +215,10 @@ int main() {
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    RenderingProperties properties;
+    properties.showNormals = false;
+    properties.showSteps = false;
 
     std::cout << "Sampler3D created with size " << sdfGrid.size() * sizeof(float) << " bytes\n";
 
@@ -229,6 +237,7 @@ int main() {
     glBindTexture(GL_TEXTURE_3D,sdfTexture);
     shader.setInt("sdfTexture",0);
 
+    //GLuint colorTexture = loadTexture("../resources/container.jpg");
     GLuint colorTexture = loadTexture("../resources/dirt.png");
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, colorTexture);
@@ -261,7 +270,8 @@ int main() {
         shader.setVec3("camRight", camera.Right);
         shader.setVec3("camUp", camera.Up);
         shader.setFloat("time",glfwGetTime());
-        shader.setInt("renderingMode",renderingMode);
+        shader.setBool("showSteps",properties.showSteps);
+        shader.setBool("showNormals",properties.showNormals);
 
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -270,7 +280,7 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::SetNextWindowSize(ImVec2(325, 200));
+        ImGui::SetNextWindowSize(ImVec2(325, 250));
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.3);
         // Begin window with no title bar, no resize, no move, no scrollbar, no collapse, no nav, no background
@@ -291,7 +301,8 @@ int main() {
         ImGui::Text("Average FPS: %.1f", averageFPS);
         ImGui::Text("Max FPS: %.1f", maxFps);
         ImGui::DragFloat("Camera Speed",&camera.MovementSpeed);
-        ImGui::SliderInt("Rendering",&renderingMode,0,1);
+        ImGui::Checkbox("Show normal",&properties.showNormals);
+        ImGui::Checkbox("Show steps",&properties.showSteps);
         ImGui::End();
 
         // Set wireframe mode
