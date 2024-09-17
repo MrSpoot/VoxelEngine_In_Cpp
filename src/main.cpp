@@ -81,10 +81,15 @@ GLuint loadTexture(const char* filePath) {
 }
 
 // Fonction SDF pour une sphère
-float sdSphere(float x, float y, float z, float centerX, float centerY, float centerZ, float radius) {
-    return sqrtf((x - centerX) * (x - centerX) +
-                 (y - centerY) * (y - centerY) +
-                 (z - centerZ) * (z - centerZ)) - radius;
+float sdSphere( glm::vec3 p, glm::vec3 center, float s )
+{
+    return length(p - center)-s;
+}
+
+float sdTorus( glm::vec3 p, glm::vec3 center, glm::vec2 t )
+{
+    glm::vec2 q = glm::vec2(length(glm::vec2(p.x,p.z) - glm::vec2(center.x,center.z))-t.x,p.y - center.y);
+    return length(q)-t.y;
 }
 
 // Générer une grille SDF 3D
@@ -100,7 +105,8 @@ std::vector<float> generateSDF(int gridSize, float voxelSize,
                 float voxelZ = z * voxelSize;
 
                 int index = x + y * gridSize + z * gridSize * gridSize;
-                sdfGrid[index] = sdSphere(voxelX, voxelY, voxelZ, centerX, centerY, centerZ, radius);
+                sdfGrid[index] = sdTorus(glm::vec3(voxelX,voxelY,voxelZ),glm::vec3(centerX,centerY,centerZ), glm::vec2(8.0,2.0));
+                //sdfGrid[index] = sdSphere(glm::vec3(voxelX,voxelY,voxelZ),glm::vec3(centerX,centerY,centerZ), radius);
             }
         }
     }
