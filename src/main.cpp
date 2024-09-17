@@ -105,8 +105,11 @@ std::vector<float> generateSDF(int gridSize, float voxelSize,
                 float voxelZ = z * voxelSize;
 
                 int index = x + y * gridSize + z * gridSize * gridSize;
-                sdfGrid[index] = sdTorus(glm::vec3(voxelX,voxelY,voxelZ),glm::vec3(centerX,centerY,centerZ), glm::vec2(8.0,2.0));
-                //sdfGrid[index] = sdSphere(glm::vec3(voxelX,voxelY,voxelZ),glm::vec3(centerX,centerY,centerZ), radius);
+
+                float sdt = sdTorus(glm::vec3(voxelX,voxelY,voxelZ),glm::vec3(centerX,centerY,centerZ), glm::vec2(9.0,2.0));
+                float sds = sdSphere(glm::vec3(voxelX,voxelY,voxelZ),glm::vec3(centerX,centerY,centerZ), 8.0);
+
+                sdfGrid[index] = fmin(sdt,sds);
             }
         }
     }
