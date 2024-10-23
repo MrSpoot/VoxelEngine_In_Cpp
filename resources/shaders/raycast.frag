@@ -12,21 +12,10 @@ uniform vec3 camUp;       // Vecteur vers le haut de la caméra
 uniform float fov;        // Champ de vision (en radians)
 uniform float aspectRatio; // Rapport d'aspect de l'écran (width / height)
 uniform float time;
-uniform int voxelGridSize;
-
-struct Voxel {
-    float color[3];
-    bool isActive;
-};
-
-// Déclarer le SSBO
-layout(std430, binding = 0) buffer Voxels {
-    Voxel voxels[];
-};
-
-// Position et taille de la grille de voxels
-const vec3 voxelGridMin = vec3(0.0, 0.0, 0.0);
-const float voxelSize = 1.0;
+uniform float voxelSize;  // Taille d'un voxel
+uniform sampler3D voxelColorTexture; // Texture 3D contenant les voxels
+uniform sampler3D binaryTexture; // Texture 3D contenant les voxels
+uniform vec3 voxelTextureSize;  // Dimensions de la texture 3D (par ex. 64x64x64)
 
 float intersectVoxel(vec3 ro, vec3 rd, vec3 voxelPos, float voxelSize) {
     vec3 invDir = 1.0 / rd;
@@ -42,54 +31,16 @@ float intersectVoxel(vec3 ro, vec3 rd, vec3 voxelPos, float voxelSize) {
     return (tmax >= max(tmin, 0.0)) ? tmin : -1.0;
 }
 
-vec3 light(vec3 pos, vec3 normal){
-    vec3 lp = vec3(cos(time) * 512.0 + voxelGridSize / 2.0,512.0,sin(time) * 512.0+ voxelGridSize / 2.0);
-    //vec3 lp = vec3(voxelGridSize/2.0,voxelGridSize * 2.0,voxelGridSize/2.0);
-    //vec3 lp = lightPos;
+vec3 light(vec3 pos, vec3 normal) {
+    //vec3 lp = vec3(cos(time) * 512.0 + voxelTextureSize.x / 2.0, 512.0, sin(time) * 512.0 + voxelTextureSize.z / 2.0);
+    vec3 lp = vec3(0,512,0);
     vec3 ld = lp - pos;
     vec3 ln = normalize(ld);
-
-    vec3 rayDir = ld;
-    vec3 rayOrigin = pos;
-
-    vec3 voxelPos = floor((rayOrigin / voxelSize) * voxelSize) + normal * 0.001;
-    vec3 step = sign(rayDir);
-    vec3 tMax = ((voxelPos + step * 0.5 + step * 0.5 * sign(rayDir) - rayOrigin) / rayDir);
-    vec3 tDelta = abs(step / rayDir);
-
-    for (int i = 0; i < 1024; i++) {
-        float t = intersectVoxel(rayOrigin, rayDir, voxelPos, voxelSize);
-        if (t > 0.0) {
-            int indexX = int(voxelPos.x / voxelSize);
-            int indexY = int(voxelPos.y / voxelSize);
-            int indexZ = int(voxelPos.z / voxelSize);
-
-            if (indexX >= 0 && indexX < voxelGridSize && indexY >= 0 && indexY < voxelGridSize && indexZ >= 0 && indexZ < voxelGridSize) {
-                int index = indexX + indexY * voxelGridSize + indexZ * voxelGridSize * voxelGridSize;
-                if (voxels[index].isActive) {
-                    return vec3(0.0);
-                }
-            }
-        }
-
-        if (tMax.x < tMax.y && tMax.x < tMax.z) {
-            voxelPos.x += step.x;
-            tMax.x += tDelta.x;
-        } else if (tMax.y < tMax.z) {
-            voxelPos.y += step.y;
-            tMax.y += tDelta.y;
-        } else {
-            voxelPos.z += step.z;
-            tMax.z += tDelta.z;
-        }
-    }
-    //return max(vec3(0.0),dot(normal,ln));
-    return max(vec3(0.0),dot(normal,ln));
+    return max(vec3(0.0), dot(normal, ln));
 }
 
 vec3 normal(vec3 hitPos, vec3 voxelCenter) {
     vec3 normal = normalize(hitPos - voxelCenter);
-    // Clamp the normal to the closest axis
     if (abs(normal.x) > abs(normal.y) && abs(normal.x) > abs(normal.z)) {
         normal = vec3(sign(normal.x), 0.0, 0.0);
     } else if (abs(normal.y) > abs(normal.x) && abs(normal.y) > abs(normal.z)) {
@@ -100,7 +51,13 @@ vec3 normal(vec3 hitPos, vec3 voxelCenter) {
     return normal;
 }
 
+bool getBitFromByte(float byteValue, int bitIndex) {
+    int byteAsInt = int(byteValue * 255.0);  // Assurer la conversion correcte de float en int
+    return (byteAsInt & (1 << bitIndex)) != 0;  // Extraire correctement le bit
+}
+
 void main() {
+
     vec2 uv = TexCoords * 2.0 - 1.0;
     uv.x *= aspectRatio;
 
@@ -115,33 +72,35 @@ void main() {
     for (int i = 0; i < 1024; i++) {
         float t = intersectVoxel(rayOrigin, rayDir, voxelPos, voxelSize);
         if (t > 0.0) {
-            int indexX = int(voxelPos.x / voxelSize);
-            int indexY = int(voxelPos.y / voxelSize);
-            int indexZ = int(voxelPos.z / voxelSize);
+            vec3 voxelTexCoords = voxelPos / voxelTextureSize;
 
-            if (indexX >= 0 && indexX < voxelGridSize && indexY >= 0 && indexY < voxelGridSize && indexZ >= 0 && indexZ < voxelGridSize) {
-                int index = indexX + indexY * voxelGridSize + indexZ * voxelGridSize * voxelGridSize;
-                if (voxels[index].isActive) {
+            if (all(greaterThanEqual(voxelTexCoords, vec3(0.0))) && all(lessThanEqual(voxelTexCoords, vec3(1.0)))) {
+                vec3 compressedCoords = vec3(voxelPos.x / (8.0 * voxelTextureSize.x), voxelPos.y / voxelTextureSize.y, voxelPos.z / voxelTextureSize.z);
+                float byteValue = texture(binaryTexture, compressedCoords).r;
+                int voxelIndex = int(voxelPos.x + voxelPos.y * voxelTextureSize.x + voxelPos.z * voxelTextureSize.x * voxelTextureSize.y);
+                int bitIndex = voxelIndex % 8;
+                bool isActive = getBitFromByte(byteValue, bitIndex);
+
+                if(isActive){
+
+                    vec4 voxelData = texture(voxelColorTexture, voxelTexCoords);
+                    vec3 color = voxelData.rgb;
 
                     vec3 hitPos = rayOrigin + rayDir * t;
                     vec3 voxelCenter = voxelPos + vec3(0.5 * voxelSize);
-                    vec3 normal = normal(hitPos, voxelCenter);
+                    vec3 norm = normal(hitPos, voxelCenter);
 
-                    vec3 color = vec3(voxels[index].color[0],voxels[index].color[1],voxels[index].color[2]);
-
-                    color *= light(hitPos,normal) + 0.1;
-
-                    color = pow(color,vec3(0.4545));
-
-                    //color = light(hitPos,normal) + 0.1;
+                    color *= light(hitPos, norm) + 0.1;
+                    color = pow(color, vec3(0.4545)); // Correction gamma
 
                     FragColor = vec4(color, 1.0);
-                    //FragColor = vec4(normal + 0.1,1.0);
                     return;
                 }
             }
+
         }
 
+        // Avancer dans la grille de voxels
         if (tMax.x < tMax.y && tMax.x < tMax.z) {
             voxelPos.x += step.x;
             tMax.x += tDelta.x;
@@ -154,5 +113,5 @@ void main() {
         }
     }
 
-    FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    FragColor = vec4(0.0, 0.0, 0.0, 1.0); // Fond noir si aucun voxel n'est trouvé
 }

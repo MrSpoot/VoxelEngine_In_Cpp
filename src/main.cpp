@@ -44,79 +44,6 @@ bool wireframeMode = false;
 float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
-GLuint loadTexture(const char* filePath) {
-    // Variables pour stocker la largeur, hauteur et nombre de canaux de l'image
-    int width, height, nrChannels;
-
-    // Charger l'image à partir du fichier avec stb_image
-    unsigned char* data = stbi_load(filePath, &width, &height, &nrChannels, 0);
-
-    GLuint textureID;
-    if (data) {
-        // Générer un ID de texture OpenGL
-        glGenTextures(1, &textureID);
-        glBindTexture(GL_TEXTURE_2D, textureID);  // Lier la texture 2D
-
-        // Paramètres de texture
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);    // Répéter la texture horizontalement
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);    // Répéter la texture verticalement
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);// Filtrage quand la texture est réduite
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);// Filtrage quand la texture est agrandie
-
-        // Vérifier si l'image contient un canal alpha (4 canaux)
-        GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
-
-        // Charger les données de texture dans OpenGL
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);  // Générer les mipmaps pour la texture
-
-        // Libérer l'image après l'avoir chargée en OpenGL
-        stbi_image_free(data);
-    } else {
-        std::cerr << "Failed to load texture: " << filePath << std::endl;
-        textureID = 0;  // Si l'image n'a pas pu être chargée, retourner 0
-    }
-
-    return textureID;
-}
-
-// Fonction SDF pour une sphère
-float sdSphere( glm::vec3 p, glm::vec3 center, float s )
-{
-    return length(p - center)-s;
-}
-
-float sdTorus( glm::vec3 p, glm::vec3 center, glm::vec2 t )
-{
-    glm::vec2 q = glm::vec2(length(glm::vec2(p.x,p.z) - glm::vec2(center.x,center.z))-t.x,p.y - center.y);
-    return length(q)-t.y;
-}
-
-// Générer une grille SDF 3D
-std::vector<float> generateSDF(int gridSize, float voxelSize,
-                               float centerX, float centerY, float centerZ, float radius) {
-    std::vector<float> sdfGrid(gridSize * gridSize * gridSize);
-
-    for (int z = 0; z < gridSize; ++z) {
-        for (int y = 0; y < gridSize; ++y) {
-            for (int x = 0; x < gridSize; ++x) {
-                float voxelX = x * voxelSize;
-                float voxelY = y * voxelSize;
-                float voxelZ = z * voxelSize;
-
-                int index = x + y * gridSize + z * gridSize * gridSize;
-
-                float sdt = sdTorus(glm::vec3(voxelX,voxelY,voxelZ),glm::vec3(centerX,centerY,centerZ), glm::vec2(9.0,2.0));
-                float sds = sdSphere(glm::vec3(voxelX,voxelY,voxelZ),glm::vec3(centerX,centerY,centerZ), 8.0);
-
-                sdfGrid[index] = fmin(sdt,sds);
-            }
-        }
-    }
-
-    return sdfGrid;
-}
-
 int main() {
     // glfw: initialize and configure
     // ------------------------------
@@ -205,52 +132,85 @@ int main() {
     // Unbind VAO
     glBindVertexArray(0);
 
-    GLuint sdfTexture;
-    glGenTextures(1, &sdfTexture);
-    glBindTexture(GL_TEXTURE_3D, sdfTexture);
-
-    int gridSize = 64;
-
-// Générer les SDF pour une sphère
-    std::vector<float> sdfGrid = generateSDF(gridSize, 1.0, gridSize/ 2.0, gridSize/ 2.0, gridSize/ 2.0, 8.0);
-    //std::vector<float> sdfGrid = generateTerrainSDF(gridSize, 1.0, 0.5, 0.8);
-
-// Charger les données SDF dans la texture 3D
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, gridSize, gridSize, gridSize, 0, GL_RED, GL_FLOAT, &sdfGrid[0]);
-
-// Paramètres de la texture
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
     RenderingProperties properties;
     properties.showNormals = false;
     properties.showSteps = false;
 
-    std::cout << "Sampler3D created with size " << sdfGrid.size() * sizeof(float) << " bytes\n";
+    int size = 256;
 
-    Shader shader("../resources/shaders/raycast.vert","../resources/shaders/raymarch.frag");
+// Générer un tableau de données (par exemple des couleurs RGBA)
+    std::vector<float> voxelData(size * size * size * 3); // 4 pour RGBA
+    for (int z = 0; z < size; z++) {
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                int index = (z * size * size + y * size + x) * 3;
+                voxelData[index] = x / (float) size;     // R
+                voxelData[index + 1] = y / (float) size; // G
+                voxelData[index + 2] = z / (float) size;  // B
+            }
+        }
+    }
+
+    int numVoxels = size * size * size;
+    int numBytes = (numVoxels + 7) / 8;
+
+    std::vector<uint8_t> compressedVoxels(numBytes);
+
+    for (int z = 0; z < size; z++) {
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                int index = z * size * size + y * size + x;
+                int byteIndex = index / 8;
+                int bitIndex = index % 8;
+
+                compressedVoxels[byteIndex] |= (1 << bitIndex);
+                //compressedVoxels[byteIndex] |= (1 << bitIndex); == 1
+                //compressedVoxels[byteIndex] &= ~(1 << bitIndex); == 0
+            }
+        }
+    }
+
+    GLuint texture3D;
+    glGenTextures(1, &texture3D);
+    glBindTexture(GL_TEXTURE_3D, texture3D);
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB, size, size, size, 0, GL_RGB, GL_FLOAT, voxelData.data());
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    GLuint binaryTexture;
+    glGenTextures(1, &binaryTexture);
+    glBindTexture(GL_TEXTURE_3D, binaryTexture);
+
+// Taille de la texture 3D sera plus petite car on utilise 1 octet pour 8 voxels
+    int compressedWidth = (size + 7) / 8;  // On réduit la largeur en fonction de la compression
+
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, compressedWidth, size, size, 0, GL_RED, GL_UNSIGNED_BYTE, compressedVoxels.data());
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    Shader shader("../resources/shaders/raycast.vert","../resources/shaders/raycast.frag");
 
     shader.use();
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_3D, texture3D);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_3D, binaryTexture);
+    shader.setInt("voxelColorTexture",0);
+    shader.setInt("binaryTexture",1);
+    shader.setFloat("voxelSize",1.0f);
+    shader.setVec3("voxelTextureSize",glm::vec3(size));
 
     shader.setFloat("fov", glm::radians(90.0f));
     shader.setFloat("aspectRatio", (float)SCR_WIDTH/(float)SCR_HEIGHT);
-    shader.setFloat("size",gridSize);
 
     glm::vec3 lightPos = glm::vec3(32.0,80.0,32.0);
-
-    shader.use();
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_3D,sdfTexture);
-    shader.setInt("sdfTexture",0);
-
-    //GLuint colorTexture = loadTexture("../resources/container.jpg");
-    GLuint colorTexture = loadTexture("../resources/dirt.png");
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, colorTexture);
-    shader.setInt("colorTexture",1);
 
     // render loop
     // -----------
