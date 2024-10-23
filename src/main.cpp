@@ -44,6 +44,42 @@ bool wireframeMode = false;
 float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
+GLuint loadTexture(const char* filePath) {
+    // Variables pour stocker la largeur, hauteur et nombre de canaux de l'image
+    int width, height, nrChannels;
+
+    // Charger l'image à partir du fichier avec stb_image
+    unsigned char* data = stbi_load(filePath, &width, &height, &nrChannels, 0);
+
+    GLuint textureID;
+    if (data) {
+        // Générer un ID de texture OpenGL
+        glGenTextures(1, &textureID);
+        glBindTexture(GL_TEXTURE_2D, textureID);  // Lier la texture 2D
+
+        // Paramètres de texture
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);    // Répéter la texture horizontalement
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);    // Répéter la texture verticalement
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);// Filtrage quand la texture est réduite
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);// Filtrage quand la texture est agrandie
+
+        // Vérifier si l'image contient un canal alpha (4 canaux)
+        GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
+
+        // Charger les données de texture dans OpenGL
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);  // Générer les mipmaps pour la texture
+
+        // Libérer l'image après l'avoir chargée en OpenGL
+        stbi_image_free(data);
+    } else {
+        std::cerr << "Failed to load texture: " << filePath << std::endl;
+        textureID = 0;  // Si l'image n'a pas pu être chargée, retourner 0
+    }
+
+    return textureID;
+}
+
 int main() {
     // glfw: initialize and configure
     // ------------------------------
@@ -136,7 +172,7 @@ int main() {
     properties.showNormals = false;
     properties.showSteps = false;
 
-    int size = 256;
+    int size = 32;
 
 // Générer un tableau de données (par exemple des couleurs RGBA)
     std::vector<float> voxelData(size * size * size * 3); // 4 pour RGBA
@@ -163,12 +199,66 @@ int main() {
                 int byteIndex = index / 8;
                 int bitIndex = index % 8;
 
-                compressedVoxels[byteIndex] |= (1 << bitIndex);
+                if(y < 5){
+                    compressedVoxels[byteIndex] |= (1 << bitIndex);
+                }else{
+                    compressedVoxels[byteIndex] &= ~(1 << bitIndex);
+                }
+
+
                 //compressedVoxels[byteIndex] |= (1 << bitIndex); == 1
                 //compressedVoxels[byteIndex] &= ~(1 << bitIndex); == 0
             }
         }
     }
+
+    std::vector<int> distances(size * size * size, size);  // Initialiser avec une valeur grande (taille max du cube)
+
+// Boucle pour remplir les distances
+    for (int z = 0; z < size; z++) {
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                int index = z * size * size + y * size + x;
+
+                // Ici, nous déterminons si le voxel est activé (par exemple, un voxel qui fait partie de la surface)
+                if (x%4==0 && y%4==0 && z%4 == 0) {
+                    distances[index] = 0;  // La distance pour les voxels activés est 0 (surface)
+                } else {
+                    // Calcul de la distance minimale au voxel activé
+                    // On doit parcourir les voxels activés voisins pour trouver la distance la plus courte
+                    int minDistance = size;
+
+                    // Parcourir les voisins proches (par exemple, 3x3x3 autour du voxel)
+                    for (int dz = -1; dz <= 1; dz++) {
+                        for (int dy = -1; dy <= 1; dy++) {
+                            for (int dx = -1; dx <= 1; dx++) {
+                                int neighborX = x + dx;
+                                int neighborY = y + dy;
+                                int neighborZ = z + dz;
+
+                                // Vérifier que les coordonnées sont dans les limites du tableau
+                                if (neighborX >= 0 && neighborX < size &&
+                                    neighborY >= 0 && neighborY < size &&
+                                    neighborZ >= 0 && neighborZ < size) {
+                                    int neighborIndex = neighborZ * size * size + neighborY * size + neighborX;
+
+                                    // Si le voisin est activé, calculer la distance euclidienne
+                                    if (distances[neighborIndex] == 0) {  // Si c'est un voxel activé (surface)
+                                        int distance = abs(dx) + abs(dy) + abs(dz);  // Distance Manhattan
+                                        minDistance = std::min(minDistance, distance);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Mettre à jour la distance minimale
+                    distances[index] = minDistance;
+                }
+            }
+        }
+    }
+
 
     GLuint texture3D;
     glGenTextures(1, &texture3D);
@@ -194,7 +284,23 @@ int main() {
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    Shader shader("../resources/shaders/raycast.vert","../resources/shaders/raycast.frag");
+    GLuint texture3D2;
+    glGenTextures(1, &texture3D2);
+    glBindTexture(GL_TEXTURE_3D, texture3D2);
+
+// Créer la texture 3D avec GL_R32I pour stocker des entiers
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32I, size, size, size, 0, GL_RED_INTEGER, GL_INT, distances.data());
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    GLuint colorTexture = loadTexture("../resources/dirt.png");
+
+
+
+    Shader shader("../resources/shaders/raycast.vert","../resources/shaders/simple_sdf.frag");
 
     shader.use();
 
@@ -202,8 +308,14 @@ int main() {
     glBindTexture(GL_TEXTURE_3D, texture3D);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_3D, binaryTexture);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_3D, texture3D2);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, colorTexture);
     shader.setInt("voxelColorTexture",0);
     shader.setInt("binaryTexture",1);
+    shader.setInt("sdfTexture",2);
+    shader.setInt("colorTexture",3);
     shader.setFloat("voxelSize",1.0f);
     shader.setVec3("voxelTextureSize",glm::vec3(size));
 
